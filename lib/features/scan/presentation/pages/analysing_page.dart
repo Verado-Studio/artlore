@@ -151,14 +151,16 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
               ),
               const SizedBox(height: 14),
               if (error == null)
-                SizedBox(
-                  height: 44,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 350),
                     child: Text(
                       _funArtFacts[_factIndex],
                       key: ValueKey(_factIndex),
                       textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: 0.65)),
                     ),
                   ),

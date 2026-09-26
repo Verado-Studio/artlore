@@ -133,7 +133,9 @@ class _ResultPageState extends State<ResultPage> {
     final lockedCount = _isPro ? 0 : _painting.details.where((d) => d.locked).length;
 
     return Scaffold(
-      body: ListView(
+      body: SafeArea(
+        top: false,
+        child: ListView(
         padding: EdgeInsets.zero,
         children: [
           Stack(
@@ -328,6 +330,7 @@ class _ResultPageState extends State<ResultPage> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

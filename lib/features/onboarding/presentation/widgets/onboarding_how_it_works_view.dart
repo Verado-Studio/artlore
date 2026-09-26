@@ -27,8 +27,8 @@ class OnboardingHowItWorksView extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 56, 28, 0),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(28, 56, 28, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

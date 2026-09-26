@@ -40,7 +40,7 @@ class OnboardingPickLevelView extends StatelessWidget {
     return SafeArea(
       bottom: false,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(28, 56, 28, 16),
+        padding: const EdgeInsets.fromLTRB(28, 56, 28, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

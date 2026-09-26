@@ -10,7 +10,9 @@ void showWrongIdSheet(BuildContext context, Painting painting) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (sheetContext) => Padding(
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
         left: 24,
@@ -70,6 +72,7 @@ void showWrongIdSheet(BuildContext context, Painting painting) {
           ),
           const SizedBox(height: 24),
         ],
+      ),
       ),
     ),
   );

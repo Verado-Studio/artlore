@@ -37,7 +37,9 @@ void showShareCardSheet(BuildContext context, Painting painting) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) => Padding(
+    builder: (context) => SafeArea(
+      top: false,
+      child: Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
@@ -112,6 +114,7 @@ void showShareCardSheet(BuildContext context, Painting painting) {
             ),
           ],
         ),
+      ),
       ),
     ),
   );

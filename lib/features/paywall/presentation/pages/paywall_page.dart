@@ -103,7 +103,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
           Positioned(
             left: 16,
             right: 16,
-            bottom: 24,
+            bottom: 24 + MediaQuery.paddingOf(context).bottom,
             top: 110,
             child: Container(
               decoration: BoxDecoration(
@@ -118,49 +118,52 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                   children: [
                     Text(
                       'Go Pro',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       widget.subtitle,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 18),
                     for (final benefit in _benefits) ...[
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(bottom: 10),
                         child: Row(
                           children: [
-                            Icon(benefit.icon, color: AppColors.ink, size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(benefit.label, style: Theme.of(context).textTheme.bodyLarge)),
+                            Icon(benefit.icon, color: AppColors.ink, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(benefit.label, style: Theme.of(context).textTheme.bodyMedium)),
                           ],
                         ),
                       ),
                     ],
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _PlanCard(
-                            title: 'Yearly',
-                            price: '\$59.99 / yr',
-                            caption: 'Save 85% · 3-day free trial',
-                            selected: isYearly,
-                            onTap: () => setState(() => _plan = 'yearly'),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _PlanCard(
+                              title: 'Yearly',
+                              price: '\$59.99 / yr',
+                              caption: 'Save 85% · 3-day free trial',
+                              selected: isYearly,
+                              onTap: () => setState(() => _plan = 'yearly'),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _PlanCard(
-                            title: 'Monthly',
-                            price: '\$9.99 / mo',
-                            caption: 'Billed monthly',
-                            selected: !isYearly,
-                            onTap: () => setState(() => _plan = 'monthly'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _PlanCard(
+                              title: 'Monthly',
+                              price: '\$9.99 / mo',
+                              caption: 'Billed monthly',
+                              selected: !isYearly,
+                              onTap: () => setState(() => _plan = 'monthly'),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 14),
                     if (isYearly)
@@ -277,13 +280,16 @@ class _PlanCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14)),
             const SizedBox(height: 6),
-            Text(price, style: Theme.of(context).textTheme.titleLarge),
+            Text(price, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16)),
             const SizedBox(height: 2),
             Text(
               caption,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: selected ? AppColors.clay : AppColors.inkSoft),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(fontSize: 11, color: selected ? AppColors.clay : AppColors.inkSoft),
             ),
           ],
         ),
