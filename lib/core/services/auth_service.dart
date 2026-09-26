@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'purchases.dart';
 import 'user_data_repository.dart';
 
 /// Thin wrapper around Firebase Authentication. Email/password, Google (web
@@ -76,6 +77,7 @@ class AuthService {
     final credential = await _upgradeOrSignIn(EmailAuthProvider.credential(email: email, password: password));
     await credential.user?.updateDisplayName(displayName);
     await UserDataRepository.migrateLocalDataIfNeeded();
+    await RevenueCatService.syncIdentity();
   }
 
   static Future<void> signIn({required String email, required String password}) async {
@@ -85,6 +87,7 @@ class AuthService {
     // `signInWithCredential` call anyway.
     await _auth.signInWithEmailAndPassword(email: email, password: password);
     await UserDataRepository.migrateLocalDataIfNeeded();
+    await RevenueCatService.syncIdentity();
   }
 
   static Future<void> signInWithGoogle() async {
@@ -113,6 +116,7 @@ class AuthService {
       await _upgradeOrSignIn(credential);
     }
     await UserDataRepository.migrateLocalDataIfNeeded();
+    await RevenueCatService.syncIdentity();
   }
 
   /// Apple's OAuth 2 provider, via Firebase's own generic `signInWithProvider`
@@ -137,9 +141,13 @@ class AuthService {
       await _auth.signInWithProvider(provider);
     }
     await UserDataRepository.migrateLocalDataIfNeeded();
+    await RevenueCatService.syncIdentity();
   }
 
-  static Future<void> signOut() => _auth.signOut();
+  static Future<void> signOut() async {
+    await _auth.signOut();
+    await RevenueCatService.syncIdentity();
+  }
 
   /// Turns a [FirebaseAuthException] into copy a user can actually act on.
   static String friendlyMessage(FirebaseAuthException error) {

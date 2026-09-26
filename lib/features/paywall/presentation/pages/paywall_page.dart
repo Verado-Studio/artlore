@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../../../core/services/purchases.dart';
 import '../../../../core/services/user_data_repository.dart';
@@ -33,6 +35,8 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   bool _submitting = false;
   bool _closeReady = false;
   Timer? _closeTimer;
+  Package? _annualPackage;
+  Package? _monthlyPackage;
 
   @override
   void initState() {
@@ -40,6 +44,24 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     _closeTimer = Timer(const Duration(seconds: 2), () {
       if (mounted) setState(() => _closeReady = true);
     });
+    _fetchOfferings();
+  }
+
+  Future<void> _fetchOfferings() async {
+    try {
+      final offerings = await Purchases.getOfferings();
+      final current = offerings.current;
+      if (current == null || !mounted) return;
+      setState(() {
+        _annualPackage = current.annual ?? current.getPackage('\$rc_annual');
+        _monthlyPackage = current.monthly ?? current.getPackage('\$rc_monthly');
+      });
+    } catch (_) {
+      // Offerings unavailable (RevenueCat not configured on this platform
+      // yet, or a network hiccup) — plan cards just keep their placeholder
+      // prices, and checkout below refuses to proceed without a real
+      // package rather than silently granting Pro for free.
+    }
   }
 
   @override
@@ -49,19 +71,48 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   }
 
   Future<void> _continue() async {
+    final isYearly = _plan == 'yearly';
+    final package = isYearly ? _annualPackage : _monthlyPackage;
+    if (package == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Pricing isn't available right now — please try again shortly.")),
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
-    // No real store/RevenueCat integration yet — this just flips the local
-    // "Pro" flag so the rest of the app's gating (scans, locked details,
-    // Art-lover depth) behaves as if a purchase went through. Prices below
-    // are placeholders too: per the brief, these should come from
-    // RevenueCat's offerings once that's wired up, never hard-coded.
-    await UserDataRepository.setPro(true);
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    Navigator.of(context).pop();
-    messenger.showSnackBar(
-      const SnackBar(content: Text("You're on Pro now — enjoy the full experience.")),
-    );
+    try {
+      final result = await Purchases.purchase(PurchaseParams.package(package));
+      final isPro = result.customerInfo.entitlements.active.containsKey('pro');
+      await UserDataRepository.setPro(isPro);
+      if (!mounted) return;
+      if (isPro) {
+        final messenger = ScaffoldMessenger.of(context);
+        Navigator.of(context).pop();
+        messenger.showSnackBar(
+          const SnackBar(content: Text("You're on Pro now — enjoy the full experience.")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Purchase went through, but Pro isn't active — try Restore Purchases.")),
+        );
+      }
+    } on PlatformException catch (e) {
+      final errorCode = PurchasesErrorHelper.getErrorCode(e);
+      if (errorCode != PurchasesErrorCode.purchaseCancelledError && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Purchase error: ${e.message ?? e.code}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Purchase error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   static const _benefits = [
@@ -144,7 +195,9 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                           Expanded(
                             child: _PlanCard(
                               title: 'Yearly',
-                              price: '\$59.99 / yr',
+                              price: _annualPackage?.storeProduct.priceString != null
+                                  ? '${_annualPackage!.storeProduct.priceString} / yr'
+                                  : '\$59.99 / yr',
                               caption: 'Save 85% · 3-day free trial',
                               selected: isYearly,
                               onTap: () => setState(() => _plan = 'yearly'),
@@ -154,7 +207,9 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                           Expanded(
                             child: _PlanCard(
                               title: 'Monthly',
-                              price: '\$9.99 / mo',
+                              price: _monthlyPackage?.storeProduct.priceString != null
+                                  ? '${_monthlyPackage!.storeProduct.priceString} / mo'
+                                  : '\$9.99 / mo',
                               caption: 'Billed monthly',
                               selected: !isYearly,
                               onTap: () => setState(() => _plan = 'monthly'),
@@ -166,7 +221,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                     const SizedBox(height: 14),
                     if (isYearly)
                       Text(
-                        '3 days free, then \$59.99/year. Cancel anytime.',
+                        '3 days free, then ${_annualPackage?.storeProduct.priceString ?? '\$59.99'}/year. Cancel anytime.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context)
                             .textTheme
