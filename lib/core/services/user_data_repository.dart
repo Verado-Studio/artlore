@@ -162,7 +162,17 @@ class UserDataRepository {
     await _awaitMigration();
     final doc = _doc;
     if (doc == null) return AppPreferences.isPro();
-    final snapshot = await doc.get();
+    // Forces a server read rather than trusting the SDK's local cache —
+    // this gates real Pro entitlements, so a stale cached "false" (e.g.
+    // right after another read/write to the same doc) must never show a
+    // paying user locked content. Falls back to cache only if genuinely
+    // offline, same as the default behavior otherwise.
+    DocumentSnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await doc.get(const GetOptions(source: Source.server));
+    } catch (_) {
+      snapshot = await doc.get();
+    }
     return (snapshot.data()?['isPro'] as bool?) ?? false;
   }
 
