@@ -1,12 +1,13 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 
 /// Persists a scan's photo into the app's own permanent storage, instead of
 /// leaving [Painting.scannedImagePath] pointing at the OS temp/cache file
 /// `image_picker`/the camera handed back — which the OS is free to clear at
 /// any time, silently breaking Collection's "open offline from cache"
-/// requirement.
+/// requirement. No-op on web, which has no real filesystem to persist to.
 class ScannedImageStore {
   ScannedImageStore._();
 
@@ -19,6 +20,7 @@ class ScannedImageStore {
 
   /// Copies [sourcePath] into permanent app storage and returns the new path.
   static Future<String> persist(String sourcePath) async {
+    if (kIsWeb) return sourcePath;
     final dir = await _scansDir();
     final ext = sourcePath.contains('.') ? sourcePath.substring(sourcePath.lastIndexOf('.')) : '.jpg';
     final destPath = '${dir.path}/${DateTime.now().microsecondsSinceEpoch}$ext';
@@ -31,7 +33,7 @@ class ScannedImageStore {
   /// never-persisted one) — failures are swallowed since this is best-effort
   /// cleanup, not user-facing.
   static Future<void> delete(String? path) async {
-    if (path == null) return;
+    if (path == null || kIsWeb) return;
     try {
       final file = File(path);
       if (await file.exists()) await file.delete();

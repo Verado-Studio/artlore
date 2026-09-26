@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:image_picker/image_picker.dart';
@@ -190,16 +191,26 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
     await startScanFlow(context, image: image);
   }
 
-  /// Copies a bundled demo asset into a real temp file and runs it through
-  /// the normal scan flow — an [XFile] backed purely by in-memory bytes has
-  /// no real filesystem path, which later steps (compression, then copying
-  /// the photo into permanent storage) need.
+  /// On Android/iOS, copies a bundled demo asset into a real temp file and
+  /// runs it through the normal scan flow — an [XFile] backed purely by
+  /// in-memory bytes has no real filesystem path, which later steps
+  /// (compression, then copying the photo into permanent storage) need. On
+  /// web there's no filesystem at all, so it's passed straight through as
+  /// in-memory bytes instead (identify still works; the later "save to
+  /// permanent storage" step is itself a no-op on web).
   Future<void> _pickSampleImage(String assetPath) async {
     Navigator.of(context).pop();
     final data = await rootBundle.load(assetPath);
+    final bytes = data.buffer.asUint8List();
+    final name = assetPath.split('/').last;
+    if (!mounted) return;
+    if (kIsWeb) {
+      await startScanFlow(context, image: XFile.fromData(bytes, name: name));
+      return;
+    }
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/${assetPath.split('/').last}');
-    await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+    final file = File('${dir.path}/$name');
+    await file.writeAsBytes(bytes, flush: true);
     if (!mounted) return;
     await startScanFlow(context, image: XFile(file.path));
   }
