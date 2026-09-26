@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/services/painting_identifier_service.dart';
+import '../../../../core/services/scanned_image_store.dart';
 import '../../../../core/services/user_data_repository.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_shell.dart';
@@ -54,7 +55,8 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
     }
     try {
       final painting = await PaintingIdentifierService.identify(image);
-      final withImage = painting.withScannedImagePath(image.path);
+      final persistedPath = await ScannedImageStore.persist(image.path);
+      final withImage = painting.withScannedImagePath(persistedPath);
       await UserDataRepository.recordScan(withImage);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(

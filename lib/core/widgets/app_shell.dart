@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart' show XFile;
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import '../../features/collection/presentation/pages/collection_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/result/presentation/pages/ask_page.dart';
 import '../../features/scan/presentation/pages/camera_page.dart';
+import '../../features/scan/presentation/scan_flow.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../services/ask_context.dart';
 import '../theme/app_colors.dart';
@@ -19,16 +24,44 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
+  StreamSubscription<List<SharedMediaFile>>? _shareSub;
 
   @override
   void initState() {
     super.initState();
     AskContext.current.addListener(_onAskContextChanged);
+    // AppShell only ever mounts once onboarding/routing has settled (see
+    // splash_page.dart / onboarding_page.dart), so it's a safe, stable place
+    // to pick up a photo shared into the app from another app's share sheet
+    // — both a cold start (the app wasn't running yet) and a warm one (the
+    // app was already open) end up here.
+    _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen(_handleSharedMedia);
+    _checkInitialSharedMedia();
+  }
+
+  Future<void> _checkInitialSharedMedia() async {
+    final media = await ReceiveSharingIntent.instance.getInitialMedia();
+    if (media.isEmpty) return;
+    await ReceiveSharingIntent.instance.reset();
+    _handleSharedMedia(media);
+  }
+
+  void _handleSharedMedia(List<SharedMediaFile> media) {
+    SharedMediaFile? image;
+    for (final file in media) {
+      if (file.type == SharedMediaType.image) {
+        image = file;
+        break;
+      }
+    }
+    if (image == null || !mounted) return;
+    startScanFlow(context, image: XFile(image.path));
   }
 
   @override
   void dispose() {
     AskContext.current.removeListener(_onAskContextChanged);
+    _shareSub?.cancel();
     super.dispose();
   }
 

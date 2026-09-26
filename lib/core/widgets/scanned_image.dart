@@ -39,8 +39,18 @@ class ScannedImage extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: kIsWeb
-          ? Image.network(path, fit: BoxFit.cover)
-          : Image.file(File(path), fit: BoxFit.cover),
+          ? Image.network(
+              path,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) =>
+                  PaintingPlaceholder(seed: seed, icon: icon, showFrame: false, borderRadius: borderRadius),
+            )
+          : Image.file(
+              File(path),
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) =>
+                  PaintingPlaceholder(seed: seed, icon: icon, showFrame: false, borderRadius: borderRadius),
+            ),
     );
   }
 }

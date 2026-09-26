@@ -4,10 +4,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'user_data_repository.dart';
 
-/// Thin wrapper around Firebase Authentication. Email/password and Google
-/// (web popup, and native Android/iOS via google_sign_in) are real; Apple
-/// sign-in needs an Apple Developer Services ID and redirect setup that
-/// isn't done here, so it's not offered as a real option.
+/// Thin wrapper around Firebase Authentication. Email/password, Google (web
+/// popup, and native Android/iOS via google_sign_in) and Apple (Firebase's
+/// generic OAuth `signInWithProvider` flow) are all real.
 class AuthService {
   AuthService._();
 
@@ -78,6 +77,20 @@ class AuthService {
       );
       await _auth.signInWithCredential(credential);
     }
+    await UserDataRepository.migrateLocalDataIfNeeded();
+  }
+
+  /// Apple's OAuth 2 provider, via Firebase's own generic `signInWithProvider`
+  /// flow (a Custom Tab/`ASWebAuthenticationSession` redirect through Apple,
+  /// landing back on Firebase's own auth-handler domain) — no separate
+  /// native SDK needed. Requires the Apple provider to be configured in
+  /// Firebase Console (Services ID, Team ID, Key ID, private key from an
+  /// Apple Developer account); without that this throws.
+  static Future<void> signInWithApple() async {
+    final provider = OAuthProvider('apple.com')
+      ..addScope('email')
+      ..addScope('name');
+    await _auth.signInWithProvider(provider);
     await UserDataRepository.migrateLocalDataIfNeeded();
   }
 

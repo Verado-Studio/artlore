@@ -1,11 +1,11 @@
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
-/// Google + Apple sign-in, side by side. Apple sign-in isn't offered on
-/// Android (there's no Apple ID to sign in with there), so on Android this
-/// renders just the Google button at full width.
+/// Google + Apple sign-in, side by side. Apple goes through Firebase's
+/// generic OAuth redirect flow (a Custom Tab / in-app browser to Apple's own
+/// sign-in page), which works the same way on Android as on iOS — it isn't
+/// limited to devices with a native Apple ID configured.
 class SocialAuthRow extends StatelessWidget {
   const SocialAuthRow({super.key, required this.onGoogleTap, required this.onAppleTap});
 
@@ -14,10 +14,6 @@ class SocialAuthRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
-    if (isAndroid) {
-      return SocialSignInButton(icon: const GoogleMark(), label: 'Continue with Google', onTap: onGoogleTap);
-    }
     return Row(
       children: [
         Expanded(child: SocialSignInButton(icon: const GoogleMark(), label: 'Google', onTap: onGoogleTap)),

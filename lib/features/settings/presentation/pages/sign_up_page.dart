@@ -65,10 +65,17 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  void _continueWithApple() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Apple sign-in isn't set up yet — use email or Google for now.")),
-    );
+  Future<void> _continueWithApple() async {
+    setState(() => _submitting = true);
+    try {
+      await AuthService.signInWithApple();
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on FirebaseAuthException catch (e) {
+      _showError(AuthService.friendlyMessage(e));
+    } catch (e) {
+      _showError("Apple sign-in isn't available right now.");
+    }
   }
 
   @override

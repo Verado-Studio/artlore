@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "326099273958-luj209hr9hbt88llj6vdocgqfr62b3kt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.veradostudio.artdetector",
+            "certificate_hash": "b7c12fc4c3cb7aea1326de99081b7dc0bc4ea06b"
+          }
+        },
+        {
           "client_id": "326099273958-fe4vg2apt5v3kctmlf3pgbp07nn7u2gq.apps.googleusercontent.com",
           "client_type": 3
         }

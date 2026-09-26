@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import '../models/painting.dart';
 import 'app_preferences.dart';
 import 'auth_service.dart';
+import 'scanned_image_store.dart';
 
 /// Account-tied data: saved paintings, scans used, default depth.
 ///
@@ -110,23 +111,35 @@ class UserDataRepository {
   /// Records every completed scan into the user's collection automatically
   /// (re-scanning the same painting just bumps it to most recent). Free
   /// accounts keep only their most recent [AppPreferences.freeScanHistoryLimit]
-  /// entries; Pro accounts keep everything.
+  /// entries; Pro accounts keep everything. Any scan photo that falls out of
+  /// the kept history (replaced by a rescan, or trimmed off the free-tier
+  /// cap) has its persisted file cleaned up too.
   static Future<void> recordScan(Painting painting) async {
     final history = await savedPaintings();
+    final replaced = history.where((p) => p.title == painting.title);
+    for (final p in replaced) {
+      if (p.scannedImagePath != painting.scannedImagePath) await ScannedImageStore.delete(p.scannedImagePath);
+    }
     history.removeWhere((p) => p.title == painting.title);
     history.add(painting);
     final proStatus = await isPro();
     if (!proStatus && history.length > AppPreferences.freeScanHistoryLimit) {
-      history.removeRange(0, history.length - AppPreferences.freeScanHistoryLimit);
+      final overflowCount = history.length - AppPreferences.freeScanHistoryLimit;
+      for (final p in history.take(overflowCount)) {
+        await ScannedImageStore.delete(p.scannedImagePath);
+      }
+      history.removeRange(0, overflowCount);
     }
     await setSavedPaintings(history);
   }
 
-  /// Removes [painting] from the user's collection entirely.
+  /// Removes [painting] from the user's collection entirely, including its
+  /// persisted scan photo.
   static Future<void> deleteScan(Painting painting) async {
     final history = await savedPaintings();
     history.removeWhere((p) => p.title == painting.title);
     await setSavedPaintings(history);
+    await ScannedImageStore.delete(painting.scannedImagePath);
   }
 
   /// Scans used today (resets at local midnight) — read-only here. The only

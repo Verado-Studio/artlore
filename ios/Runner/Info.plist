@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is used to photograph paintings so we can identify them and tell you their story.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photo library access lets you pick an existing photo of a painting to identify instead of taking a new one.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
