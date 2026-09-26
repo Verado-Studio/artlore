@@ -40,7 +40,7 @@ class OnboardingHowItWorksView extends StatelessWidget {
             ),
             const SizedBox(height: 40),
             for (var i = 0; i < _steps.length; i++) ...[
-              _StepRow(number: i + 1, step: _steps[i]),
+              _StepRow(step: _steps[i]),
               if (i != _steps.length - 1) const SizedBox(height: 40),
             ],
           ],
@@ -51,45 +51,39 @@ class OnboardingHowItWorksView extends StatelessWidget {
 }
 
 class _StepRow extends StatelessWidget {
-  const _StepRow({required this.number, required this.step});
+  const _StepRow({required this.step});
 
-  final int number;
   final ({IconData icon, String title, String subtitle}) step;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: const BoxDecoration(color: AppColors.pastelYellow, shape: BoxShape.circle),
-          child: Icon(step.icon, color: AppColors.ink, size: 26),
-        ),
-        const SizedBox(width: 18),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$number',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(color: AppColors.pastelYellow, shape: BoxShape.circle),
+              child: Icon(step.icon, color: AppColors.ink, size: 26),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Text(
                 step.title,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 6),
-              Text(
-                step.subtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.4),
-              ),
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.only(left: 74),
+          child: Text(
+            step.subtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.4),
           ),
         ),
       ],

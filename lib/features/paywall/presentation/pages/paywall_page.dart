@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/services/purchases.dart';
 import '../../../../core/services/user_data_repository.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../settings/presentation/pages/privacy_policy_page.dart';
-import '../../../settings/presentation/pages/terms_page.dart';
 
 /// Shows the Pro paywall as a dialog-style sheet: the triggering screen stays
 /// visible (dimmed) behind it, with a close control over that reveal and a
@@ -197,25 +195,6 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                       child: TextButton(
                         onPressed: () => restorePurchases(context),
                         child: const Text('Restore Purchases'),
-                      ),
-                    ),
-                    Center(
-                      child: Wrap(
-                        alignment: WrapAlignment.center,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const TermsPage()),
-                            ),
-                            child: const Text('Terms'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
-                            ),
-                            child: const Text('Privacy'),
-                          ),
-                        ],
                       ),
                     ),
                   ],

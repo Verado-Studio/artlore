@@ -29,6 +29,17 @@ class PaintingQuotaExceededException implements Exception {
   String toString() => message;
 }
 
+/// Thrown when Gemini determines the photo isn't of a painting/artwork at
+/// all — distinct from a low-confidence identification, which still is art,
+/// just not a recognized piece.
+class NotArtworkException implements Exception {
+  NotArtworkException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// Identifies a painting by writing a "pending" request document to
 /// Firestore and waiting for a Cloud Function (triggered by that write) to
 /// fill in the result. This avoids needing a publicly-invokable HTTP
@@ -59,6 +70,9 @@ class PaintingIdentifierService {
 
     final data = await _waitForCompletion(docRef);
     final result = Map<String, dynamic>.from(data['result'] as Map? ?? {});
+    if (result['isArtwork'] == false) {
+      throw NotArtworkException("This doesn't look like a painting — try scanning an actual artwork.");
+    }
     final storiesRaw = Map<String, dynamic>.from(result['stories'] as Map? ?? {});
     final shortStoriesRaw = Map<String, dynamic>.from(result['shortStories'] as Map? ?? {});
     final detailsRaw = (result['details'] as List? ?? []).cast<Map>();

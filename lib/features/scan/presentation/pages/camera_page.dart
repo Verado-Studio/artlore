@@ -1,13 +1,25 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/painting_placeholder.dart';
 import '../scan_flow.dart';
 import '../widgets/viewfinder_grid.dart';
+
+/// Bundled demo photos so the app can be tried out without a real painting
+/// on hand — picking one runs through the exact same identify pipeline as a
+/// real camera/gallery photo.
+const _sampleImages = [
+  (asset: 'assets/image1.webp', label: 'Christ Carrying the Cross'),
+  (asset: 'assets/image2.webp', label: 'The Persistence of Memory'),
+  (asset: 'assets/image3.jpg', label: 'Blue Dancers'),
+];
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -16,16 +28,22 @@ class CameraPage extends StatefulWidget {
   State<CameraPage> createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage> {
+class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateMixin {
+  late final AnimationController _bounceController =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+  late final Animation<double> _bounceAnimation = Tween<double>(begin: 0, end: -8)
+      .chain(CurveTween(curve: Curves.easeInOut))
+      .animate(_bounceController);
   bool _flashOn = false;
-  bool _gridOn = true;
   bool _capturing = false;
-  double _aspectRatio = 0.78;
+  static const _aspectRatio = 0.78;
   Offset? _focusPoint;
   Timer? _focusRingTimer;
+  double _zoomLevel = 1;
+  double _minZoom = 1;
+  double _maxZoom = 1;
 
   List<CameraDescription> _cameras = const [];
-  int _cameraIndex = 0;
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
   String? _error;
@@ -39,6 +57,7 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void dispose() {
     _focusRingTimer?.cancel();
+    _bounceController.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -50,15 +69,19 @@ class _CameraPageState extends State<CameraPage> {
         if (mounted) setState(() => _error = 'No camera found on this device — use Gallery instead.');
         return;
       }
-      await _openCamera(_cameraIndex);
+      final backCamera = _cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.back,
+        orElse: () => _cameras.first,
+      );
+      await _openCamera(backCamera);
     } catch (_) {
       if (mounted) setState(() => _error = "Couldn't access the camera — use Gallery instead.");
     }
   }
 
-  Future<void> _openCamera(int index) async {
+  Future<void> _openCamera(CameraDescription description) async {
     final previous = _controller;
-    final controller = CameraController(_cameras[index], ResolutionPreset.medium, enableAudio: false);
+    final controller = CameraController(description, ResolutionPreset.medium, enableAudio: false);
     final initializeFuture = controller.initialize();
     setState(() {
       _controller = controller;
@@ -68,10 +91,30 @@ class _CameraPageState extends State<CameraPage> {
     try {
       await initializeFuture;
       await controller.setFlashMode(_flashOn ? FlashMode.torch : FlashMode.off);
+      final minZoom = await controller.getMinZoomLevel();
+      final maxZoom = await controller.getMaxZoomLevel();
+      if (mounted) {
+        setState(() {
+          _minZoom = minZoom;
+          _maxZoom = maxZoom;
+          _zoomLevel = minZoom;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _error = "Couldn't access the camera — use Gallery instead.");
     } finally {
       await previous?.dispose();
+    }
+  }
+
+  Future<void> _setZoom(double value) async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    setState(() => _zoomLevel = value);
+    try {
+      await controller.setZoomLevel(value);
+    } catch (_) {
+      // Not every device supports programmatic zoom.
     }
   }
 
@@ -107,31 +150,6 @@ class _CameraPageState extends State<CameraPage> {
     });
   }
 
-  Future<void> _resetFocus() async {
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
-    try {
-      await controller.setFocusMode(FocusMode.auto);
-      await controller.setExposureMode(ExposureMode.auto);
-    } catch (_) {
-      // Not every device/browser supports switching focus mode.
-    }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Focus reset to auto'), duration: Duration(seconds: 1)),
-    );
-  }
-
-  void _cycleAspectRatio() {
-    setState(() => _aspectRatio = _aspectRatio == 0.78 ? 1.0 : 0.78);
-  }
-
-  Future<void> _flipCamera() async {
-    if (_cameras.length < 2) return;
-    _cameraIndex = (_cameraIndex + 1) % _cameras.length;
-    await _openCamera(_cameraIndex);
-  }
-
   Future<void> _capture() async {
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized || _capturing) return;
@@ -158,6 +176,55 @@ class _CameraPageState extends State<CameraPage> {
     await startScanFlow(context, image: image);
   }
 
+  /// Copies a bundled demo asset into a real temp file and runs it through
+  /// the normal scan flow — an [XFile] backed purely by in-memory bytes has
+  /// no real filesystem path, which later steps (compression, then copying
+  /// the photo into permanent storage) need.
+  Future<void> _pickSampleImage(String assetPath) async {
+    Navigator.of(context).pop();
+    final data = await rootBundle.load(assetPath);
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/${assetPath.split('/').last}');
+    await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+    if (!mounted) return;
+    await startScanFlow(context, image: XFile(file.path));
+  }
+
+  void _showSampleImagePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.ink,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "No painting handy? Try a sample",
+                style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  for (final sample in _sampleImages)
+                    _SampleThumbnail(
+                      asset: sample.asset,
+                      label: sample.label,
+                      onTap: () => _pickSampleImage(sample.asset),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -171,22 +238,10 @@ class _CameraPageState extends State<CameraPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _ToolbarIcon(icon: Icons.arrow_back, onTap: () => Navigator.of(context).pop()),
-                  Row(
-                    children: [
-                      _ToolbarIcon(
-                        icon: _flashOn ? Icons.flash_on : Icons.flash_off_outlined,
-                        onTap: _toggleFlash,
-                      ),
-                      const SizedBox(width: 8),
-                      _ToolbarIcon(icon: Icons.center_focus_weak_outlined, onTap: _resetFocus),
-                      const SizedBox(width: 8),
-                      _ToolbarIcon(icon: Icons.crop_free, onTap: _cycleAspectRatio),
-                      const SizedBox(width: 8),
-                      _ToolbarIcon(
-                        icon: _gridOn ? Icons.grid_on_outlined : Icons.grid_off_outlined,
-                        onTap: () => setState(() => _gridOn = !_gridOn),
-                      ),
-                    ],
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(foregroundColor: Colors.white),
+                    child: const Text('Skip'),
                   ),
                 ],
               ),
@@ -233,7 +288,7 @@ class _CameraPageState extends State<CameraPage> {
                                         fit: StackFit.expand,
                                         children: [
                                           _buildPreview(),
-                                          if (_gridOn) const ViewfinderGrid(),
+                                          const ViewfinderGrid(),
                                           if (_focusPoint case final point?)
                                             Positioned(
                                               left: point.dx - 24,
@@ -264,15 +319,65 @@ class _CameraPageState extends State<CameraPage> {
                 ),
               ),
             ),
+            if (_maxZoom > _minZoom)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 48),
+                child: Row(
+                  children: [
+                    const Icon(Icons.remove, color: Colors.white70, size: 16),
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          activeTrackColor: Colors.white,
+                          inactiveTrackColor: Colors.white24,
+                          thumbColor: Colors.white,
+                          overlayColor: Colors.white24,
+                          trackHeight: 2,
+                        ),
+                        child: Slider(
+                          value: _zoomLevel.clamp(_minZoom, _maxZoom),
+                          min: _minZoom,
+                          max: _maxZoom,
+                          onChanged: _setZoom,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.add, color: Colors.white70, size: 16),
+                  ],
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _GalleryShortcut(onTap: _pickFromGallery),
                   _ShutterButton(onTap: _capturing ? null : _capture),
-                  _ToolbarIcon(icon: Icons.flip_camera_ios_outlined, onTap: _flipCamera),
+                  _ToolbarIcon(
+                    icon: _flashOn ? Icons.flash_on : Icons.flash_off_outlined,
+                    onTap: _toggleFlash,
+                  ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: InkWell(
+                onTap: _showSampleImagePicker,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: AnimatedBuilder(
+                    animation: _bounceAnimation,
+                    builder: (context, child) {
+                      return Transform.translate(
+                        offset: Offset(0, _bounceAnimation.value),
+                        child: child,
+                      );
+                    },
+                    child: const Icon(Icons.keyboard_arrow_up, color: Colors.white70, size: 28),
+                  ),
+                ),
               ),
             ),
           ],
@@ -367,6 +472,42 @@ class _ShutterButton extends StatelessWidget {
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
         child: const DecoratedBox(decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+      ),
+    );
+  }
+}
+
+class _SampleThumbnail extends StatelessWidget {
+  const _SampleThumbnail({required this.asset, required this.label, required this.onTap});
+
+  final String asset;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(asset, width: 84, height: 84, fit: BoxFit.cover),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: 84,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+            ),
+          ),
+        ],
       ),
     );
   }

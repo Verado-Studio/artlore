@@ -1,6 +1,6 @@
 {
-    "name": "artdetector",
-    "short_name": "artdetector",
+    "name": "Artlore",
+    "short_name": "Artlore",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

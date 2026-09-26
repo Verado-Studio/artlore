@@ -34,19 +34,6 @@ class HelpSupportPage extends StatelessWidget {
     await launchUrl(uri);
   }
 
-  void _liveChat(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Live chat'),
-        content: const Text("Live chat isn't available yet — email us instead at ryan@veradostudio.com."),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('OK')),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -76,26 +63,11 @@ class HelpSupportPage extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ContactCard(
-                          icon: Icons.mail_outline,
-                          label: 'Email us',
-                          subtitle: 'ryan@veradostudio.com',
-                          onTap: _emailUs,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _ContactCard(
-                          icon: Icons.chat_bubble_outline,
-                          label: 'Live chat',
-                          subtitle: 'Mon–Fri, 9–5',
-                          onTap: () => _liveChat(context),
-                        ),
-                      ),
-                    ],
+                  _ContactCard(
+                    icon: Icons.mail_outline,
+                    label: 'Email us',
+                    subtitle: 'ryan@veradostudio.com',
+                    onTap: _emailUs,
                   ),
                   const SizedBox(height: 28),
                   Text('Frequently asked questions', style: Theme.of(context).textTheme.titleMedium),

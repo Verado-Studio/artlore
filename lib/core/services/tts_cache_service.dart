@@ -21,6 +21,49 @@ class TtsCacheService {
 
   static bool get _supportsFileCache => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
+  static bool _voiceConfigured = false;
+
+  /// Switches to one of iOS's "Siri" voices, if the device has one
+  /// downloaded (Settings → Accessibility → Spoken Content → Voices) —
+  /// same narration behavior, just a nicer-sounding voice. Runs once, and
+  /// silently keeps the platform default if no Siri voice is available.
+  static Future<void> _configureVoiceIfNeeded() async {
+    if (_voiceConfigured || kIsWeb || !Platform.isIOS) return;
+    _voiceConfigured = true;
+    try {
+      final voices = await _tts.getVoices;
+      if (voices is! List) return;
+      final siriVoices = voices
+          .whereType<Map>()
+          .where((v) => (v['name'] as String? ?? '').toLowerCase().contains('siri'))
+          .toList()
+        ..sort((a, b) {
+          int rank(Map v) {
+            final quality = (v['quality'] as String? ?? '').toLowerCase();
+            if (quality.contains('premium')) return 0;
+            if (quality.contains('enhanced')) return 1;
+            return 2;
+          }
+
+          return rank(a).compareTo(rank(b));
+        });
+      if (siriVoices.isEmpty) return;
+      final chosen = siriVoices.first;
+      final identifier = chosen['identifier'] as String?;
+      if (identifier != null && identifier.isNotEmpty) {
+        await _tts.setVoice({'identifier': identifier});
+      } else {
+        await _tts.setVoice({
+          'name': chosen['name'] as String? ?? '',
+          'locale': chosen['locale'] as String? ?? '',
+        });
+      }
+    } catch (_) {
+      // No Siri voice on this device, or the platform call failed — keep
+      // whatever voice flutter_tts already defaults to.
+    }
+  }
+
   /// Whether [pause]/[resume] actually pause and resume in place, rather than
   /// just stopping — true wherever playback goes through [_player] (the same
   /// platforms that support file caching), since `AudioPlayer.pause` keeps
@@ -36,6 +79,7 @@ class TtsCacheService {
 
   /// Speaks [text], invoking [onDone] when playback finishes or fails.
   static Future<void> speak({required String cacheKey, required String text, required VoidCallback onDone}) async {
+    await _configureVoiceIfNeeded();
     if (_supportsFileCache) {
       final path = await _cachePathFor(cacheKey);
       final file = File(path);

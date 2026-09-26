@@ -35,8 +35,15 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
   late final AnimationController _shimmer =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
   Timer? _factTimer;
+  Timer? _progressTimer;
   int _factIndex = math.Random().nextInt(_funArtFacts.length);
   String? _error;
+
+  /// Real identify progress isn't reported incrementally by the server, so
+  /// this is a simulated crawl toward (never reaching) 94% — just enough to
+  /// keep the wait feeling active. It jumps away entirely once the real
+  /// result or error arrives.
+  double _progress = 0;
 
   @override
   void initState() {
@@ -44,6 +51,20 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
     _identify();
     _factTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted) setState(() => _factIndex = (_factIndex + 1) % _funArtFacts.length);
+    });
+    _startProgressSimulation();
+  }
+
+  void _startProgressSimulation() {
+    const tick = Duration(milliseconds: 200);
+    const expectedTicks = 45; // ~9s ease-out crawl toward 94%
+    var elapsed = 0;
+    _progressTimer = Timer.periodic(tick, (timer) {
+      elapsed++;
+      final t = (elapsed / expectedTicks).clamp(0.0, 1.0);
+      final eased = 1 - math.pow(1 - t, 3);
+      if (mounted) setState(() => _progress = eased * 0.94);
+      if (t >= 1.0) timer.cancel();
     });
   }
 
@@ -58,20 +79,27 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
       final persistedPath = await ScannedImageStore.persist(image.path);
       final withImage = painting.withScannedImagePath(persistedPath);
       await UserDataRepository.recordScan(withImage);
+      _progressTimer?.cancel();
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => ResultPage(painting: withImage)),
       );
     } on PaintingQuotaExceededException catch (e) {
+      _progressTimer?.cancel();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const AppShell()),
         (route) => false,
       );
       showPaywallSheet(context, subtitle: e.message);
+    } on NotArtworkException catch (e) {
+      _progressTimer?.cancel();
+      if (mounted) setState(() => _error = e.message);
     } on PaintingIdentificationException catch (e) {
+      _progressTimer?.cancel();
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
+      _progressTimer?.cancel();
       if (mounted) setState(() => _error = "Couldn't identify the painting — please try again.");
     }
   }
@@ -80,6 +108,7 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
   void dispose() {
     _shimmer.dispose();
     _factTimer?.cancel();
+    _progressTimer?.cancel();
     super.dispose();
   }
 
@@ -150,7 +179,32 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
                 style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white),
               ),
               const SizedBox(height: 14),
-              if (error == null)
+              if (error == null) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: _progress,
+                          minHeight: 6,
+                          backgroundColor: Colors.white.withValues(alpha: 0.15),
+                          valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 36,
+                      child: Text(
+                        '${(_progress * 100).round()}%',
+                        textAlign: TextAlign.right,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: AnimatedSwitcher(
@@ -165,11 +219,16 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
                     ),
                   ),
                 ),
+              ],
               const Spacer(),
               if (error != null)
                 ElevatedButton(
                   onPressed: () {
-                    setState(() => _error = null);
+                    setState(() {
+                      _error = null;
+                      _progress = 0;
+                    });
+                    _startProgressSimulation();
                     _identify();
                   },
                   child: const Text('Try again'),

@@ -146,11 +146,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   SettingsTile(icon: Icons.tune, label: 'Default depth', value: _depth, onTap: _pickDepth),
                   SettingsTile(icon: Icons.restore, label: 'Restore purchases', onTap: () => restorePurchases(context)),
                   SettingsTile(
-                    icon: Icons.workspace_premium_outlined,
-                    label: 'Manage subscription',
-                    onTap: openManageSubscription,
-                  ),
-                  SettingsTile(
                     icon: Icons.privacy_tip_outlined,
                     label: 'Privacy policy',
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PrivacyPolicyPage())),

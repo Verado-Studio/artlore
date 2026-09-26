@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'user_data_repository.dart';
 
@@ -20,10 +19,4 @@ Future<void> restorePurchases(BuildContext context) async {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text(isPro ? 'Your Pro subscription has been restored.' : 'No purchases found to restore.')),
   );
-}
-
-/// Opens the platform's subscription-management page.
-Future<void> openManageSubscription() async {
-  final uri = Uri.parse('https://play.google.com/store/account/subscriptions');
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
 }

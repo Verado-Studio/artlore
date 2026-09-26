@@ -19,6 +19,13 @@ class TermsPage extends StatelessWidget {
               'ID?" option to help us improve.',
         ),
         (
+          heading: 'Creating an account',
+          body: 'You can use ${AppStrings.appName} as a guest, or create an account with email and password, '
+              '"Continue with Google," or "Continue with Apple" to sync your Collection and Pro status across '
+              'devices. You are responsible for keeping your sign-in credentials secure and for activity that '
+              'happens under your account.',
+        ),
+        (
           heading: 'Free and Pro plans',
           body: 'The free plan includes a limited number of scans per day. Pro is billed through your app store '
               'account as a monthly or annual subscription and can be managed or cancelled from your device '

@@ -51,20 +51,55 @@ class AuthService {
     }
   }
 
+  /// Every device is signed in anonymously from launch (see [ensureSignedIn])
+  /// so its scans land in Firestore under that anonymous uid. A plain
+  /// `createUserWithEmailAndPassword`/`signInWithCredential` call abandons
+  /// that uid for a brand-new one, which is what was silently losing scans
+  /// on sign-up — [_upgradeOrSignIn] links the new credential onto the
+  /// *same* anonymous account instead, keeping its uid (and Firestore data)
+  /// intact, unless that credential already belongs to a different,
+  /// pre-existing account — in which case switching to that account (and
+  /// leaving this device's anonymous data behind) is the correct behavior.
+  static Future<UserCredential> _upgradeOrSignIn(AuthCredential credential) async {
+    final current = _auth.currentUser;
+    if (current != null && current.isAnonymous) {
+      try {
+        return await current.linkWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        if (e.code != 'credential-already-in-use' && e.code != 'email-already-in-use') rethrow;
+      }
+    }
+    return _auth.signInWithCredential(credential);
+  }
+
   static Future<void> signUp({required String email, required String password, required String displayName}) async {
-    final credential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+    final credential = await _upgradeOrSignIn(EmailAuthProvider.credential(email: email, password: password));
     await credential.user?.updateDisplayName(displayName);
     await UserDataRepository.migrateLocalDataIfNeeded();
   }
 
   static Future<void> signIn({required String email, required String password}) async {
+    // A plain sign-in is always into a pre-existing separate account, so
+    // there's no anonymous uid worth preserving here — `_upgradeOrSignIn`
+    // would just hit `email-already-in-use` and fall through to the same
+    // `signInWithCredential` call anyway.
     await _auth.signInWithEmailAndPassword(email: email, password: password);
     await UserDataRepository.migrateLocalDataIfNeeded();
   }
 
   static Future<void> signInWithGoogle() async {
     if (kIsWeb) {
-      await _auth.signInWithPopup(GoogleAuthProvider());
+      final current = _auth.currentUser;
+      if (current != null && current.isAnonymous) {
+        try {
+          await current.linkWithPopup(GoogleAuthProvider());
+        } on FirebaseAuthException catch (e) {
+          if (e.code != 'credential-already-in-use' && e.code != 'email-already-in-use') rethrow;
+          await _auth.signInWithPopup(GoogleAuthProvider());
+        }
+      } else {
+        await _auth.signInWithPopup(GoogleAuthProvider());
+      }
     } else {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
@@ -75,7 +110,7 @@ class AuthService {
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      await _auth.signInWithCredential(credential);
+      await _upgradeOrSignIn(credential);
     }
     await UserDataRepository.migrateLocalDataIfNeeded();
   }
@@ -90,7 +125,17 @@ class AuthService {
     final provider = OAuthProvider('apple.com')
       ..addScope('email')
       ..addScope('name');
-    await _auth.signInWithProvider(provider);
+    final current = _auth.currentUser;
+    if (current != null && current.isAnonymous) {
+      try {
+        await current.linkWithProvider(provider);
+      } on FirebaseAuthException catch (e) {
+        if (e.code != 'credential-already-in-use' && e.code != 'email-already-in-use') rethrow;
+        await _auth.signInWithProvider(provider);
+      }
+    } else {
+      await _auth.signInWithProvider(provider);
+    }
     await UserDataRepository.migrateLocalDataIfNeeded();
   }
 

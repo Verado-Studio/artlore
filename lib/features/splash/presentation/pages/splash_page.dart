@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/services/app_preferences.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_shell.dart';
 import '../../../../core/widgets/painting_placeholder.dart';
 import '../../../onboarding/presentation/pages/onboarding_page.dart';
@@ -49,11 +48,8 @@ class _SplashPageState extends State<SplashPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                  child: const Icon(Icons.palette_outlined, color: AppColors.clay, size: 38),
+                ClipOval(
+                  child: Image.asset('assets/logo.png', width: 96, height: 96, fit: BoxFit.cover),
                 ),
                 const SizedBox(height: 22),
                 Text(
