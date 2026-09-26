@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Scratch request/response docs for the AI pipeline: the client creates
+    // a "pending" doc and only the Cloud Function (Admin SDK, which bypasses
+    // these rules) ever updates it with a result. Anyone can read one back
+    // by its own auto-generated ID — that ID is an unguessable ~20-character
+    // string, so this is the same practical privacy as a bearer token, and
+    // these docs never hold anything more sensitive than a scan already
+    // does within the app itself. Every device (including guests) signs in
+    // anonymously, so `request.auth` always exists; `userId` must match the
+    // caller's own uid so nobody can burn through someone else's scan quota
+    // by attributing requests to their account.
+    match /identifyRequests/{requestId} {
+      allow create: if request.auth != null
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.imageBase64 is string
+                    && request.resource.data.mimeType is string
+                    && request.resource.data.userId == request.auth.uid;
+      allow read: if true;
+      allow update, delete: if false;
+    }
+
+    match /chatRequests/{requestId} {
+      allow create: if request.auth != null
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.question is string
+                    && request.resource.data.painting is map;
+      allow read: if true;
+      allow update, delete: if false;
+    }
+
+    // "Wrong ID?" corrections: write-only feedback log, not tied to an
+    // account, never read back by the client.
+    match /wrongIdReports/{reportId} {
+      allow create: if request.resource.data.paintingTitle is string
+                    && request.resource.data.suggestedCorrection is string;
+      allow read, update, delete: if false;
+    }
+  }
+}

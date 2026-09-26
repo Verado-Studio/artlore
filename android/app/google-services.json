@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "326099273958",
+    "project_id": "paintings-identifier",
+    "storage_bucket": "paintings-identifier.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:326099273958:android:d4a78dabe428668df25327",
+        "android_client_info": {
+          "package_name": "com.veradostudio.artdetector"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "326099273958-i19b2eil9jl4nerpcr4p4gnvo58kpnna.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.veradostudio.artdetector",
+            "certificate_hash": "eecfccd28f025fd269afe96c4244fca63c00d44f"
+          }
+        },
+        {
+          "client_id": "326099273958-fe4vg2apt5v3kctmlf3pgbp07nn7u2gq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3QriVrOlq3-u772DVf684CJN8HqNS6kU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "326099273958-fe4vg2apt5v3kctmlf3pgbp07nn7u2gq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "326099273958-ra7k7i7el3gm5uf5pj493snm43cm3n2r.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.veradostudio.artdetector"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
