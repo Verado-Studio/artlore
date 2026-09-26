@@ -92,9 +92,6 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
         (route) => false,
       );
       showPaywallSheet(context, subtitle: e.message);
-    } on NotArtworkException catch (e) {
-      _progressTimer?.cancel();
-      if (mounted) setState(() => _error = e.message);
     } on PaintingIdentificationException catch (e) {
       _progressTimer?.cancel();
       if (mounted) setState(() => _error = e.message);
@@ -168,6 +165,37 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
                             );
                           },
                         ),
+                      if (error == null)
+                        Positioned(
+                          left: 16,
+                          right: 16,
+                          bottom: 14,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: _progress,
+                                    minHeight: 6,
+                                    backgroundColor: Colors.white.withValues(alpha: 0.3),
+                                    valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${(_progress * 100).round()}%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -180,31 +208,6 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
               ),
               const SizedBox(height: 14),
               if (error == null) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: _progress,
-                          minHeight: 6,
-                          backgroundColor: Colors.white.withValues(alpha: 0.15),
-                          valueColor: const AlwaysStoppedAnimation(AppColors.gold),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 36,
-                      child: Text(
-                        '${(_progress * 100).round()}%',
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: AnimatedSwitcher(

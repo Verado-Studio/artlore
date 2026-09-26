@@ -49,13 +49,6 @@ async function checkAndConsumeScanQuota(userId: string, scanDateKey: string): Pr
 const PAINTING_SCHEMA = {
   type: "object",
   properties: {
-    isArtwork: {
-      type: "boolean",
-      description:
-        "Whether the photo actually shows a painting or other fine-art artwork (on a wall, canvas, print, " +
-        "postcard, book page, etc.). Set to false for anything that isn't art — a person, an object, a " +
-        "document, a random scene, and so on — even if you still fill in the other fields with a best guess.",
-    },
     title: { type: "string", description: "The painting's title. Use 'Untitled' if unknown." },
     artist: { type: "string", description: "The artist's name. Use 'Unknown' if not identifiable." },
     year: {
@@ -111,16 +104,14 @@ const PAINTING_SCHEMA = {
       },
     },
   },
-  required: ["isArtwork", "title", "artist", "year", "movement", "museum", "confidence", "hook", "stories", "details"],
+  required: ["title", "artist", "year", "movement", "museum", "confidence", "hook", "stories", "details"],
 };
 
 const IDENTIFY_SYSTEM_PROMPT =
   "You are an expert art historian helping a museum-goer identify a painting from a photo they just took. " +
-  "First check whether the photo actually shows a painting or artwork at all — if it's a person, an object, " +
-  "a document, or some other random subject, set isArtwork to false. Otherwise, examine the image and " +
-  "identify the painting if you recognize it. If you cannot confidently identify the specific work, still " +
-  "describe what you can observe (style, subject, technique, likely era) and report a low confidence score " +
-  "rather than guessing a specific title. Always respond with the requested JSON fields.";
+  "Examine the image and identify the painting if you recognize it. If you cannot confidently identify the " +
+  "specific work, still describe what you can observe (style, subject, technique, likely era) and report a " +
+  "low confidence score rather than guessing a specific title. Always respond with the requested JSON fields.";
 
 interface GeminiStep {
   type: string;
@@ -261,7 +252,6 @@ export const onIdentifyRequestCreated = onDocumentCreated(
       await ref.update({
         status: "complete",
         result: {
-          isArtwork: result.isArtwork !== false,
           title: (result.title as string) || "Untitled",
           artist: (result.artist as string) || "Unknown",
           year: (result.year as string) || "Unknown",

@@ -16,9 +16,9 @@ import '../widgets/viewfinder_grid.dart';
 /// on hand — picking one runs through the exact same identify pipeline as a
 /// real camera/gallery photo.
 const _sampleImages = [
-  (asset: 'assets/image1.webp', label: 'Christ Carrying the Cross'),
-  (asset: 'assets/image2.webp', label: 'The Persistence of Memory'),
-  (asset: 'assets/image3.jpg', label: 'Blue Dancers'),
+  'assets/image1.webp',
+  'assets/image2.webp',
+  'assets/image3.jpg',
 ];
 
 class CameraPage extends StatefulWidget {
@@ -90,7 +90,22 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
     });
     try {
       await initializeFuture;
+    } catch (_) {
+      if (mounted) setState(() => _error = "Couldn't access the camera — use Gallery instead.");
+      await previous?.dispose();
+      return;
+    }
+
+    // Neither of these is essential to a working camera — some devices
+    // don't support torch mode or reporting a zoom range at all — so a
+    // failure here only means "no flash toggle"/"no zoom slider", not a
+    // full camera error.
+    try {
       await controller.setFlashMode(_flashOn ? FlashMode.torch : FlashMode.off);
+    } catch (_) {
+      // Flash unsupported on this device — leave the toggle inert.
+    }
+    try {
       final minZoom = await controller.getMinZoomLevel();
       final maxZoom = await controller.getMaxZoomLevel();
       if (mounted) {
@@ -101,10 +116,9 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _error = "Couldn't access the camera — use Gallery instead.");
-    } finally {
-      await previous?.dispose();
+      // Zoom unsupported/unreadable on this device — the slider just won't show.
     }
+    await previous?.dispose();
   }
 
   Future<void> _setZoom(double value) async {
@@ -210,11 +224,10 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  for (final sample in _sampleImages)
+                  for (final asset in _sampleImages)
                     _SampleThumbnail(
-                      asset: sample.asset,
-                      label: sample.label,
-                      onTap: () => _pickSampleImage(sample.asset),
+                      asset: asset,
+                      onTap: () => _pickSampleImage(asset),
                     ),
                 ],
               ),
@@ -478,10 +491,9 @@ class _ShutterButton extends StatelessWidget {
 }
 
 class _SampleThumbnail extends StatelessWidget {
-  const _SampleThumbnail({required this.asset, required this.label, required this.onTap});
+  const _SampleThumbnail({required this.asset, required this.onTap});
 
   final String asset;
-  final String label;
   final VoidCallback onTap;
 
   @override
@@ -489,25 +501,9 @@ class _SampleThumbnail extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(asset, width: 84, height: 84, fit: BoxFit.cover),
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            width: 84,
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 11),
-            ),
-          ),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.asset(asset, width: 84, height: 84, fit: BoxFit.cover),
       ),
     );
   }

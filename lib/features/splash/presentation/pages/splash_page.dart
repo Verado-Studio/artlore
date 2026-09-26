@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/services/app_preferences.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_shell.dart';
-import '../../../../core/widgets/painting_placeholder.dart';
 import '../../../onboarding/presentation/pages/onboarding_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -39,32 +39,26 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const PaintingPlaceholder(icon: Icons.landscape_outlined, seed: 2, showFrame: false, borderRadius: 0),
-          Container(color: Colors.black.withValues(alpha: 0.4)),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipOval(
-                  child: Image.asset('assets/logo.png', width: 96, height: 96, fit: BoxFit.cover),
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  AppStrings.appName,
-                  style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Look closer. Discover more.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: 0.75)),
-                ),
-              ],
+      backgroundColor: AppColors.ink,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipOval(
+              child: Image.asset('assets/logo.png', width: 96, height: 96, fit: BoxFit.cover),
             ),
-          ),
-        ],
+            const SizedBox(height: 22),
+            Text(
+              AppStrings.appName,
+              style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Look closer. Discover more.',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: 0.75)),
+            ),
+          ],
+        ),
       ),
     );
   }
