@@ -136,6 +136,8 @@ async function callGemini(body: Record<string, unknown>): Promise<GeminiInteract
   }
 
   if (!response.ok) {
+    const bodyText = await response.text().catch(() => "");
+    console.error(`Gemini API error ${response.status}: ${bodyText.slice(0, 2000)}`);
     switch (response.status) {
       case 400:
         throw new AppError("The AI backend rejected the request.");

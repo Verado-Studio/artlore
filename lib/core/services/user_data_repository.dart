@@ -133,6 +133,15 @@ class UserDataRepository {
     await setSavedPaintings(history);
   }
 
+  /// Flips the favorite star on a painting already in the collection.
+  static Future<void> toggleFavorite(Painting painting) async {
+    final history = await savedPaintings();
+    final index = history.indexWhere((p) => p.title == painting.title);
+    if (index == -1) return;
+    history[index] = history[index].withFavorite(!history[index].isFavorite);
+    await setSavedPaintings(history);
+  }
+
   /// Removes [painting] from the user's collection entirely, including its
   /// persisted scan photo.
   static Future<void> deleteScan(Painting painting) async {

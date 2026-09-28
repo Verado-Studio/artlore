@@ -47,6 +47,8 @@ class Painting {
     required this.details,
     this.shortStories = const {},
     this.scannedImagePath,
+    this.scannedAt,
+    this.isFavorite = false,
   });
 
   final String title;
@@ -73,6 +75,13 @@ class Painting {
   /// above still comes from mock content regardless of what was photographed.
   final String? scannedImagePath;
 
+  /// When this scan was recorded — used to show a relative "X ago" timestamp
+  /// in the collection list. Null for scans saved before this field existed.
+  final DateTime? scannedAt;
+
+  /// Whether the user has starred this scan in their collection.
+  final bool isFavorite;
+
   bool get isLowConfidence => confidence < 60;
 
   /// The story text to actually show for [depth]: the short (free-tier)
@@ -96,6 +105,25 @@ class Painting {
         shortStories: shortStories,
         details: details,
         scannedImagePath: path,
+        scannedAt: DateTime.now(),
+        isFavorite: isFavorite,
+      );
+
+  Painting withFavorite(bool value) => Painting(
+        title: title,
+        artist: artist,
+        year: year,
+        movement: movement,
+        museum: museum,
+        confidence: confidence,
+        imageSeed: imageSeed,
+        hook: hook,
+        stories: stories,
+        shortStories: shortStories,
+        details: details,
+        scannedImagePath: scannedImagePath,
+        scannedAt: scannedAt,
+        isFavorite: value,
       );
 
   Map<String, dynamic> toJson() => {
@@ -111,6 +139,8 @@ class Painting {
         'shortStories': shortStories,
         'details': details.map((d) => d.toJson()).toList(),
         'scannedImagePath': scannedImagePath,
+        'scannedAt': scannedAt?.toIso8601String(),
+        'isFavorite': isFavorite,
       };
 
   factory Painting.fromJson(Map<String, dynamic> json) => Painting(
@@ -128,5 +158,7 @@ class Painting {
             .map((d) => PaintingDetail.fromJson(Map<String, dynamic>.from(d as Map)))
             .toList(),
         scannedImagePath: json['scannedImagePath'] as String?,
+        scannedAt: json['scannedAt'] == null ? null : DateTime.tryParse(json['scannedAt'] as String),
+        isFavorite: json['isFavorite'] as bool? ?? false,
       );
 }

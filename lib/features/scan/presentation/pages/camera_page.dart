@@ -219,19 +219,62 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.ink,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (sheetContext) => SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "No painting handy? Try a sample",
-                style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(color: Colors.white),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.16),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.auto_awesome, size: 18, color: AppColors.gold),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'No painting handy?',
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Tap a sample below to try a scan.',
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.white.withValues(alpha: 0.6)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -345,29 +388,12 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
             ),
             if (_maxZoom > _minZoom)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 48),
-                child: Row(
-                  children: [
-                    const Icon(Icons.remove, color: Colors.white70, size: 16),
-                    Expanded(
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: Colors.white,
-                          inactiveTrackColor: Colors.white24,
-                          thumbColor: Colors.white,
-                          overlayColor: Colors.white24,
-                          trackHeight: 2,
-                        ),
-                        child: Slider(
-                          value: _zoomLevel.clamp(_minZoom, _maxZoom),
-                          min: _minZoom,
-                          max: _maxZoom,
-                          onChanged: _setZoom,
-                        ),
-                      ),
-                    ),
-                    const Icon(Icons.add, color: Colors.white70, size: 16),
-                  ],
+                padding: const EdgeInsets.only(bottom: 4),
+                child: _ZoomArcControl(
+                  min: _minZoom,
+                  max: _maxZoom,
+                  value: _zoomLevel,
+                  onChanged: _setZoom,
                 ),
               ),
             Padding(
@@ -511,10 +537,20 @@ class _SampleThumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.asset(asset, width: 84, height: 84, fit: BoxFit.cover),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.4),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.asset(asset, width: 92, height: 92, fit: BoxFit.cover),
+        ),
       ),
     );
   }
@@ -540,4 +576,114 @@ class _GalleryShortcut extends StatelessWidget {
       ),
     );
   }
+}
+
+/// iOS-style curved zoom dial: a dotted arc from [min] to [max] with a
+/// draggable pill showing the current multiplier, matching the native
+/// Camera app's zoom control instead of a plain straight slider.
+class _ZoomArcControl extends StatelessWidget {
+  const _ZoomArcControl({required this.min, required this.max, required this.value, required this.onChanged});
+
+  final double min;
+  final double max;
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  static const _width = 220.0;
+  static const _height = 64.0;
+
+  void _handle(Offset localPosition) {
+    final t = (localPosition.dx / _width).clamp(0.0, 1.0);
+    onChanged(min + t * (max - min));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = (max > min) ? ((value - min) / (max - min)).clamp(0.0, 1.0) : 0.0;
+    return Center(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (details) => _handle(details.localPosition),
+        onHorizontalDragUpdate: (details) => _handle(details.localPosition),
+        child: SizedBox(
+          width: _width,
+          height: _height,
+          child: CustomPaint(
+            painter: _ZoomArcPainter(
+              t: t,
+              minLabel: '${min.toStringAsFixed(0)}x',
+              maxLabel: '${max.toStringAsFixed(0)}x',
+              valueLabel: '${value.toStringAsFixed(1)}x',
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ZoomArcPainter extends CustomPainter {
+  _ZoomArcPainter({required this.t, required this.minLabel, required this.maxLabel, required this.valueLabel});
+
+  final double t;
+  final String minLabel;
+  final String maxLabel;
+  final String valueLabel;
+
+  static Offset _pointOnArc(Size size, double t) {
+    final p0 = Offset(size.width * 0.06, size.height * 0.92);
+    final p2 = Offset(size.width * 0.94, size.height * 0.92);
+    final pc = Offset(size.width * 0.5, size.height * 0.02);
+    final u = 1 - t;
+    return Offset(
+      u * u * p0.dx + 2 * u * t * pc.dx + t * t * p2.dx,
+      u * u * p0.dy + 2 * u * t * pc.dy + t * t * p2.dy,
+    );
+  }
+
+  void _drawLabel(
+    Canvas canvas,
+    String text,
+    Offset center, {
+    Color color = Colors.white70,
+    FontWeight weight = FontWeight.w500,
+    double fontSize = 12,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: TextStyle(color: color, fontSize: fontSize, fontWeight: weight)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dotPaint = Paint()..color = Colors.white.withValues(alpha: 0.8);
+    const dotCount = 26;
+    for (var i = 0; i <= dotCount; i++) {
+      canvas.drawCircle(_pointOnArc(size, i / dotCount), 1.5, dotPaint);
+    }
+
+    _drawLabel(canvas, minLabel, _pointOnArc(size, 0) + const Offset(0, 12), color: Colors.white60, fontSize: 11);
+    _drawLabel(canvas, maxLabel, _pointOnArc(size, 1) + const Offset(0, 12), color: Colors.white60, fontSize: 11);
+
+    final bubbleCenter = _pointOnArc(size, t);
+    final bubbleRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: bubbleCenter, width: 48, height: 26),
+      const Radius.circular(13),
+    );
+    canvas.drawRRect(bubbleRect, Paint()..color = Colors.black.withValues(alpha: 0.55));
+    canvas.drawRRect(
+      bubbleRect,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    _drawLabel(canvas, valueLabel, bubbleCenter, color: Colors.white, weight: FontWeight.w700, fontSize: 13);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ZoomArcPainter oldDelegate) =>
+      oldDelegate.t != t || oldDelegate.valueLabel != valueLabel;
 }

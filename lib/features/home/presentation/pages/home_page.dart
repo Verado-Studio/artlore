@@ -109,7 +109,7 @@ class _HomePageState extends State<HomePage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Your recent scans', style: Theme.of(context).textTheme.titleLarge),
+                Text('Recently Scanned', style: Theme.of(context).textTheme.titleLarge),
                 TextButton(
                   onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CollectionPage())),
                   style: TextButton.styleFrom(foregroundColor: AppColors.inkSoft),

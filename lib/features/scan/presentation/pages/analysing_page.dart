@@ -166,34 +166,30 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
                           },
                         ),
                       if (error == null)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: _BorderProgressPainter(progress: _progress, radius: 24, strokeWidth: 4),
+                            ),
+                          ),
+                        ),
+                      if (error == null)
                         Positioned(
-                          left: 16,
-                          right: 16,
                           bottom: 14,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: _progress,
-                                    minHeight: 6,
-                                    backgroundColor: Colors.white.withValues(alpha: 0.3),
-                                    valueColor: const AlwaysStoppedAnimation(AppColors.gold),
-                                  ),
-                                ),
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              const SizedBox(width: 10),
-                              Text(
+                              child: Text(
                                 '${(_progress * 100).round()}%',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                  shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-                                ),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                     ],
@@ -262,4 +258,51 @@ class _SweepGradientTransform extends GradientTransform {
   Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
     return Matrix4.translationValues(offset, 0, 0);
   }
+}
+
+/// Traces analysis progress around the image frame's own rounded border
+/// instead of a separate bar — a faint full track plus a gold segment that
+/// grows from the top-left corner clockwise as [progress] increases.
+class _BorderProgressPainter extends CustomPainter {
+  const _BorderProgressPainter({required this.progress, required this.radius, required this.strokeWidth});
+
+  final double progress;
+  final double radius;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final inset = strokeWidth / 2;
+    final rect = Rect.fromLTWH(inset, inset, size.width - strokeWidth, size.height - strokeWidth);
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+    final trackPath = Path()..addRRect(rrect);
+
+    canvas.drawPath(
+      trackPath,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.25)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth,
+    );
+
+    final clamped = progress.clamp(0.0, 1.0);
+    if (clamped <= 0) return;
+    final metrics = trackPath.computeMetrics().toList();
+    if (metrics.isEmpty) return;
+    final metric = metrics.first;
+    final progressPath = metric.extractPath(0, metric.length * clamped);
+
+    canvas.drawPath(
+      progressPath,
+      Paint()
+        ..color = AppColors.gold
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BorderProgressPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.strokeWidth != strokeWidth || oldDelegate.radius != radius;
 }

@@ -5,11 +5,18 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/scanned_image.dart';
 
 class CollectionGridItem extends StatelessWidget {
-  const CollectionGridItem({super.key, required this.painting, required this.onTap, required this.onDelete});
+  const CollectionGridItem({
+    super.key,
+    required this.painting,
+    required this.onTap,
+    required this.onDelete,
+    required this.onToggleFavorite,
+  });
 
   final Painting painting;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -31,15 +38,32 @@ class CollectionGridItem extends StatelessWidget {
                     showFrame: false,
                   ),
                   Positioned(
-                    top: 6,
-                    right: 6,
+                    top: 8,
+                    left: 8,
+                    child: InkWell(
+                      onTap: onToggleFavorite,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.4), shape: BoxShape.circle),
+                        child: Icon(
+                          painting.isFavorite ? Icons.favorite : Icons.favorite_border,
+                          size: 15,
+                          color: painting.isFavorite ? AppColors.clay : Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
                     child: InkWell(
                       onTap: onDelete,
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), shape: BoxShape.circle),
-                        child: const Icon(Icons.close, size: 14, color: Colors.white),
+                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.4), shape: BoxShape.circle),
+                        child: const Icon(Icons.close, size: 15, color: Colors.white),
                       ),
                     ),
                   ),
@@ -52,15 +76,32 @@ class CollectionGridItem extends StatelessWidget {
             painting.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 14),
           ),
           const SizedBox(height: 2),
           Text(
             '${painting.artist} · ${painting.year}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.clay, fontWeight: FontWeight.w600),
           ),
+          if (painting.movement.isNotEmpty && painting.movement != '—') ...[
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                const Icon(Icons.palette_outlined, size: 12, color: AppColors.inkSoft),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    painting.movement,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft, fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
