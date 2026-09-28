@@ -32,7 +32,12 @@ Future<void> showDetailSheet(BuildContext context, Painting painting, PaintingDe
                   child: SizedBox(
                     width: 40,
                     height: 40,
-                    child: ScannedImage(seed: painting.imageSeed, imagePath: painting.scannedImagePath, showFrame: false),
+                    child: ScannedImage(
+                      seed: painting.imageSeed,
+                      imagePath: painting.scannedImagePath,
+                      assetPath: painting.assetImagePath,
+                      showFrame: false,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -77,6 +82,7 @@ Future<void> showDetailSheet(BuildContext context, Painting painting, PaintingDe
                             child: ScannedImage(
                               seed: painting.imageSeed + 2,
                               imagePath: painting.scannedImagePath,
+                              assetPath: painting.assetImagePath,
                               showFrame: false,
                             ),
                           ),
@@ -97,7 +103,12 @@ Future<void> showDetailSheet(BuildContext context, Painting painting, PaintingDe
                           ),
                         ],
                       )
-                    : ScannedImage(seed: painting.imageSeed + 2, imagePath: painting.scannedImagePath, showFrame: false),
+                    : ScannedImage(
+                        seed: painting.imageSeed + 2,
+                        imagePath: painting.scannedImagePath,
+                        assetPath: painting.assetImagePath,
+                        showFrame: false,
+                      ),
               ),
             ),
             if (locked) ...[

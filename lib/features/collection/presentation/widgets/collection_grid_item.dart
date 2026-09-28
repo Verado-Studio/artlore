@@ -34,6 +34,7 @@ class CollectionGridItem extends StatelessWidget {
                   ScannedImage(
                     seed: painting.imageSeed,
                     imagePath: painting.scannedImagePath,
+                    assetPath: painting.assetImagePath,
                     borderRadius: 16,
                     showFrame: false,
                   ),

@@ -47,6 +47,7 @@ class Painting {
     required this.details,
     this.shortStories = const {},
     this.scannedImagePath,
+    this.assetImagePath,
     this.scannedAt,
     this.isFavorite = false,
   });
@@ -74,6 +75,11 @@ class Painting {
   /// there's no real identification backend yet, so the rest of the data
   /// above still comes from mock content regardless of what was photographed.
   final String? scannedImagePath;
+
+  /// A bundled app asset to show instead of a real photo — used for curated
+  /// entries (e.g. "Explore Masterpieces") that have a real reference image
+  /// but no user-captured scan. Ignored once [scannedImagePath] is set.
+  final String? assetImagePath;
 
   /// When this scan was recorded — used to show a relative "X ago" timestamp
   /// in the collection list. Null for scans saved before this field existed.
@@ -105,6 +111,7 @@ class Painting {
         shortStories: shortStories,
         details: details,
         scannedImagePath: path,
+        assetImagePath: assetImagePath,
         scannedAt: DateTime.now(),
         isFavorite: isFavorite,
       );
@@ -122,6 +129,7 @@ class Painting {
         shortStories: shortStories,
         details: details,
         scannedImagePath: scannedImagePath,
+        assetImagePath: assetImagePath,
         scannedAt: scannedAt,
         isFavorite: value,
       );
@@ -139,6 +147,7 @@ class Painting {
         'shortStories': shortStories,
         'details': details.map((d) => d.toJson()).toList(),
         'scannedImagePath': scannedImagePath,
+        'assetImagePath': assetImagePath,
         'scannedAt': scannedAt?.toIso8601String(),
         'isFavorite': isFavorite,
       };
@@ -158,6 +167,7 @@ class Painting {
             .map((d) => PaintingDetail.fromJson(Map<String, dynamic>.from(d as Map)))
             .toList(),
         scannedImagePath: json['scannedImagePath'] as String?,
+        assetImagePath: json['assetImagePath'] as String?,
         scannedAt: json['scannedAt'] == null ? null : DateTime.tryParse(json['scannedAt'] as String),
         isFavorite: json['isFavorite'] as bool? ?? false,
       );

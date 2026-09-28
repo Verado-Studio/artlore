@@ -142,6 +142,7 @@ class MockPaintings {
     museum: 'Louvre Museum, Paris',
     confidence: 98,
     imageSeed: 3,
+    assetImagePath: 'assets/explore1.webp',
     hook: "The most famous smile in art history — and nobody agrees on what it means.",
     stories: {
       'Kid':
@@ -196,6 +197,7 @@ class MockPaintings {
     museum: 'The Hermitage Museum, Saint Petersburg',
     confidence: 90,
     imageSeed: 4,
+    assetImagePath: 'assets/explore2.webp',
     hook: "Painted in the last year of his life, it's Rembrandt's quiet meditation on forgiveness.",
     stories: {
       'Kid':
@@ -249,6 +251,7 @@ class MockPaintings {
     museum: 'Rijksmuseum, Amsterdam',
     confidence: 94,
     imageSeed: 5,
+    assetImagePath: 'assets/explore3.webp',
     hook: "It isn't actually set at night — centuries of dirty varnish just made everyone think so.",
     stories: {
       'Kid':

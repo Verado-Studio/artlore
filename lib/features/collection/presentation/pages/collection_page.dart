@@ -13,9 +13,9 @@ import '../../../scan/presentation/pages/camera_page.dart';
 import '../widgets/collection_grid_item.dart';
 
 const _featured = [
-  (painting: MockPaintings.monaLisa, asset: 'assets/explore1.webp'),
-  (painting: MockPaintings.prodigalSon, asset: 'assets/explore2.webp'),
-  (painting: MockPaintings.nightWatch, asset: 'assets/explore3.webp'),
+  MockPaintings.monaLisa,
+  MockPaintings.prodigalSon,
+  MockPaintings.nightWatch,
 ];
 
 enum _CollectionFilter { all, favorites, recent }
@@ -313,10 +313,9 @@ class _CollectionPageState extends State<CollectionPage> {
                           itemCount: _featured.length,
                           separatorBuilder: (_, _) => const SizedBox(width: 14),
                           itemBuilder: (context, i) => _ExploreCard(
-                            asset: _featured[i].asset,
-                            painting: _featured[i].painting,
+                            painting: _featured[i],
                             onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => ResultPage(painting: _featured[i].painting)),
+                              MaterialPageRoute(builder: (_) => ResultPage(painting: _featured[i])),
                             ),
                           ),
                         ),
@@ -424,9 +423,8 @@ class _DiscoverCard extends StatelessWidget {
 }
 
 class _ExploreCard extends StatelessWidget {
-  const _ExploreCard({required this.asset, required this.painting, required this.onTap});
+  const _ExploreCard({required this.painting, required this.onTap});
 
-  final String asset;
   final Painting painting;
   final VoidCallback onTap;
 
@@ -441,7 +439,7 @@ class _ExploreCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.asset(asset, width: 128, height: 128, fit: BoxFit.cover),
+              child: Image.asset(painting.assetImagePath!, width: 128, height: 128, fit: BoxFit.cover),
             ),
             const SizedBox(height: 8),
             Text(

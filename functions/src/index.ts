@@ -8,7 +8,7 @@ initializeApp();
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
-const MODEL = "gemini-3.8-flash";
+const MODEL = "gemini-3.5-flash-lite";
 
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 

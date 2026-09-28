@@ -22,7 +22,12 @@ class RecentScanCard extends StatelessWidget {
             SizedBox(
               height: 128,
               width: 128,
-              child: ScannedImage(seed: painting.imageSeed, imagePath: painting.scannedImagePath, borderRadius: 16),
+              child: ScannedImage(
+                seed: painting.imageSeed,
+                imagePath: painting.scannedImagePath,
+                assetPath: painting.assetImagePath,
+                borderRadius: 16,
+              ),
             ),
             const SizedBox(height: 8),
             Text(

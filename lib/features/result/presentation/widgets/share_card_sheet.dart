@@ -63,6 +63,7 @@ void showShareCardSheet(BuildContext context, Painting painting) {
                         child: ScannedImage(
                           seed: painting.imageSeed,
                           imagePath: painting.scannedImagePath,
+                          assetPath: painting.assetImagePath,
                           borderRadius: 16,
                           showFrame: false,
                         ),

@@ -15,6 +15,7 @@ class ScannedImage extends StatelessWidget {
     super.key,
     required this.seed,
     this.imagePath,
+    this.assetPath,
     this.icon = Icons.image_outlined,
     this.showFrame = true,
     this.borderRadius = 20,
@@ -22,6 +23,10 @@ class ScannedImage extends StatelessWidget {
 
   final int seed;
   final String? imagePath;
+
+  /// A bundled app asset to show when there's no real [imagePath] — see
+  /// [Painting.assetImagePath].
+  final String? assetPath;
   final IconData icon;
   final bool showFrame;
   final double borderRadius;
@@ -29,7 +34,8 @@ class ScannedImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = imagePath;
-    if (path == null) {
+    final asset = assetPath;
+    if (path == null && asset == null) {
       return PaintingPlaceholder(seed: seed, icon: icon, showFrame: showFrame, borderRadius: borderRadius);
     }
     return Container(
@@ -38,19 +44,26 @@ class ScannedImage extends StatelessWidget {
         border: showFrame ? Border.all(color: AppColors.divider, width: 6) : null,
       ),
       clipBehavior: Clip.antiAlias,
-      child: kIsWeb
-          ? Image.network(
-              path,
+      child: path == null
+          ? Image.asset(
+              asset!,
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) =>
                   PaintingPlaceholder(seed: seed, icon: icon, showFrame: false, borderRadius: borderRadius),
             )
-          : Image.file(
-              File(path),
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
-                  PaintingPlaceholder(seed: seed, icon: icon, showFrame: false, borderRadius: borderRadius),
-            ),
+          : kIsWeb
+              ? Image.network(
+                  path,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      PaintingPlaceholder(seed: seed, icon: icon, showFrame: false, borderRadius: borderRadius),
+                )
+              : Image.file(
+                  File(path),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      PaintingPlaceholder(seed: seed, icon: icon, showFrame: false, borderRadius: borderRadius),
+                ),
     );
   }
 }
