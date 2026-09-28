@@ -40,25 +40,32 @@ class _SplashPageState extends State<SplashPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.ink,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipOval(
-              child: Image.asset('assets/logo.png', width: 96, height: 96, fit: BoxFit.cover),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset('assets/splash.jfif', fit: BoxFit.cover),
+          Container(color: AppColors.ink.withValues(alpha: 0.55)),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipOval(
+                  child: Image.asset('assets/logo.png', width: 128, height: 128, fit: BoxFit.cover),
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  AppStrings.appName,
+                  style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Look closer. Discover more.',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: 0.75)),
+                ),
+              ],
             ),
-            const SizedBox(height: 22),
-            Text(
-              AppStrings.appName,
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Look closer. Discover more.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: 0.75)),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/mock/mock_paintings.dart';
 import '../../../../core/models/painting.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/user_data_repository.dart';
@@ -10,6 +11,12 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../result/presentation/pages/result_page.dart';
 import '../../../scan/presentation/pages/camera_page.dart';
 import '../widgets/collection_grid_item.dart';
+
+const _featured = [
+  (painting: MockPaintings.monaLisa, asset: 'assets/explore1.webp'),
+  (painting: MockPaintings.prodigalSon, asset: 'assets/explore2.webp'),
+  (painting: MockPaintings.nightWatch, asset: 'assets/explore3.webp'),
+];
 
 enum _CollectionFilter { all, favorites, recent }
 
@@ -92,7 +99,7 @@ class _CollectionPageState extends State<CollectionPage> {
     if (_filter == _CollectionFilter.favorites) {
       return 'No favorites yet — tap the heart on a painting to save it here.';
     }
-    if (_items.isEmpty) return 'No saved paintings yet — scan one to get started.';
+    if (_items.isEmpty) return 'No saved paintings';
     return 'No paintings found';
   }
 
@@ -180,14 +187,9 @@ class _CollectionPageState extends State<CollectionPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'My Collection',
+                          'Collection',
                           style:
                               Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 26, fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Your personal gallery',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
                         ),
                       ],
                     ),
@@ -214,7 +216,7 @@ class _CollectionPageState extends State<CollectionPage> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   _FilterChip(
@@ -256,6 +258,13 @@ class _CollectionPageState extends State<CollectionPage> {
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: 24),
                   children: [
+                    _DiscoverCard(
+                      onTap: () async {
+                        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CameraPage()));
+                        _load();
+                      },
+                    ),
+                    const SizedBox(height: 20),
                     if (filtered.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 32),
@@ -293,13 +302,26 @@ class _CollectionPageState extends State<CollectionPage> {
                           );
                         },
                       ),
-                    const SizedBox(height: 20),
-                    _DiscoverCard(
-                      onTap: () async {
-                        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CameraPage()));
-                        _load();
-                      },
-                    ),
+                    if (filtered.isEmpty) ...[
+                      const SizedBox(height: 28),
+                      Text('Explore Masterpieces', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 190,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _featured.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 14),
+                          itemBuilder: (context, i) => _ExploreCard(
+                            asset: _featured[i].asset,
+                            painting: _featured[i].painting,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => ResultPage(painting: _featured[i].painting)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -394,6 +416,46 @@ class _DiscoverCard extends StatelessWidget {
               ),
             ),
             const Icon(Icons.arrow_forward, size: 18, color: AppColors.inkSoft),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExploreCard extends StatelessWidget {
+  const _ExploreCard({required this.asset, required this.painting, required this.onTap});
+
+  final String asset;
+  final Painting painting;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 128,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(asset, width: 128, height: 128, fit: BoxFit.cover),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              painting.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            Text(
+              painting.artist,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+            ),
           ],
         ),
       ),

@@ -100,12 +100,12 @@ class _ContactCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(16)),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(icon, color: AppColors.ink),
             const SizedBox(height: 10),
-            Text(label, style: Theme.of(context).textTheme.titleMedium),
-            Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+            Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
+            Text(subtitle, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),

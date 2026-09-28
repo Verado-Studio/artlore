@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/constants/art_facts.dart';
 import '../../../../core/services/painting_identifier_service.dart';
 import '../../../../core/services/scanned_image_store.dart';
 import '../../../../core/services/user_data_repository.dart';
@@ -12,15 +13,6 @@ import '../../../../core/widgets/app_shell.dart';
 import '../../../../core/widgets/scanned_image.dart';
 import '../../../paywall/presentation/pages/paywall_page.dart';
 import '../../../result/presentation/pages/result_page.dart';
-
-const _funArtFacts = [
-  "Van Gogh sold only one painting during his lifetime.",
-  "The Mona Lisa has no eyebrows — it was fashionable to shave them off.",
-  "A Jackson Pollock painting once sold for over \$200 million.",
-  "Leonardo da Vinci was left-handed and wrote in mirror script.",
-  "The paint on Rembrandt's canvases is sometimes inches thick.",
-  "Edvard Munch's 'The Scream' has been stolen twice — and recovered twice.",
-];
 
 class AnalysingPage extends StatefulWidget {
   const AnalysingPage({super.key, this.image});
@@ -36,7 +28,7 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
   Timer? _factTimer;
   Timer? _progressTimer;
-  int _factIndex = math.Random().nextInt(_funArtFacts.length);
+  int _factIndex = math.Random().nextInt(artFacts.length);
   String? _error;
 
   /// Real identify progress isn't reported incrementally by the server, so
@@ -50,7 +42,7 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
     super.initState();
     _identify();
     _factTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) setState(() => _factIndex = (_factIndex + 1) % _funArtFacts.length);
+      if (mounted) setState(() => _factIndex = (_factIndex + 1) % artFacts.length);
     });
     _startProgressSimulation();
   }
@@ -209,7 +201,7 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 350),
                     child: Text(
-                      _funArtFacts[_factIndex],
+                      artFacts[_factIndex],
                       key: ValueKey(_factIndex),
                       textAlign: TextAlign.center,
                       maxLines: 3,

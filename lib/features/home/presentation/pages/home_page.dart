@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/constants/art_facts.dart';
+import '../../../../core/constants/sample_images.dart';
 import '../../../../core/models/painting.dart';
 import '../../../../core/services/app_preferences.dart';
 import '../../../../core/services/auth_service.dart';
@@ -31,6 +34,7 @@ class _HomePageState extends State<HomePage> {
   List<Painting> _recentScans = [];
   String? _displayName;
   bool _isPro = false;
+  final int _factIndex = math.Random().nextInt(artFacts.length);
   late final StreamSubscription<User?> _authSubscription;
 
   @override
@@ -64,6 +68,11 @@ class _HomePageState extends State<HomePage> {
     final image = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (image == null || !mounted) return;
     await startScanFlow(context, image: image);
+  }
+
+  Future<void> _pickSample(String assetPath) async {
+    await startSampleScanFlow(context, assetPath);
+    _loadUserData();
   }
 
   @override
@@ -117,15 +126,31 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
+            _ArtFactCard(fact: artFacts[_factIndex]),
+            const SizedBox(height: 20),
             SizedBox(
               height: 190,
               child: recent.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Scan a painting to see it here',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
-                      ),
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'No paintings yet — try a sample:',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              for (final asset in sampleImages) ...[
+                                Expanded(child: _HomeSampleThumb(asset: asset, onTap: () => _pickSample(asset))),
+                                if (asset != sampleImages.last) const SizedBox(width: 12),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     )
                   : ListView.separated(
                       scrollDirection: Axis.horizontal,
@@ -141,6 +166,63 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HomeSampleThumb extends StatelessWidget {
+  const _HomeSampleThumb({required this.asset, required this.onTap});
+
+  final String asset;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.asset(asset, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+      ),
+    );
+  }
+}
+
+class _ArtFactCard extends StatelessWidget {
+  const _ArtFactCard({required this.fact});
+
+  final String fact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(18)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(color: AppColors.pastelYellow, shape: BoxShape.circle),
+            child: const Icon(Icons.lightbulb_outline, size: 18, color: AppColors.clayDark),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Did you know?',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(fact, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

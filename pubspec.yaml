@@ -83,6 +83,11 @@ flutter:
     - assets/image1.webp
     - assets/image2.webp
     - assets/image3.jpg
+    - assets/home-banner.jfif
+    - assets/splash.jfif
+    - assets/explore1.webp
+    - assets/explore2.webp
+    - assets/explore3.webp
 
   # To add assets to your application, add an assets section, like this:
   # assets:

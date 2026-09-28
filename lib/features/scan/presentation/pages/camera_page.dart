@@ -1,26 +1,14 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
+import '../../../../core/constants/sample_images.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/painting_placeholder.dart';
 import '../scan_flow.dart';
 import '../widgets/viewfinder_grid.dart';
-
-/// Bundled demo photos so the app can be tried out without a real painting
-/// on hand — picking one runs through the exact same identify pipeline as a
-/// real camera/gallery photo.
-const _sampleImages = [
-  'assets/image1.webp',
-  'assets/image2.webp',
-  'assets/image3.jpg',
-];
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -112,7 +100,9 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
       if (mounted) {
         setState(() {
           _minZoom = minZoom;
-          _maxZoom = maxZoom;
+          // Some devices report absurdly high digital-zoom ceilings (100x+)
+          // that make the control useless — cap it at a sane range.
+          _maxZoom = maxZoom > 4.0 ? 4.0 : maxZoom;
           _zoomLevel = minZoom;
         });
       }
@@ -191,28 +181,10 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
     await startScanFlow(context, image: image);
   }
 
-  /// On Android/iOS, copies a bundled demo asset into a real temp file and
-  /// runs it through the normal scan flow — an [XFile] backed purely by
-  /// in-memory bytes has no real filesystem path, which later steps
-  /// (compression, then copying the photo into permanent storage) need. On
-  /// web there's no filesystem at all, so it's passed straight through as
-  /// in-memory bytes instead (identify still works; the later "save to
-  /// permanent storage" step is itself a no-op on web).
   Future<void> _pickSampleImage(String assetPath) async {
     Navigator.of(context).pop();
-    final data = await rootBundle.load(assetPath);
-    final bytes = data.buffer.asUint8List();
-    final name = assetPath.split('/').last;
     if (!mounted) return;
-    if (kIsWeb) {
-      await startScanFlow(context, image: XFile.fromData(bytes, name: name));
-      return;
-    }
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/$name');
-    await file.writeAsBytes(bytes, flush: true);
-    if (!mounted) return;
-    await startScanFlow(context, image: XFile(file.path));
+    await startSampleScanFlow(context, assetPath);
   }
 
   void _showSampleImagePicker() {
@@ -278,7 +250,7 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  for (final asset in _sampleImages)
+                  for (final asset in sampleImages)
                     _SampleThumbnail(
                       asset: asset,
                       onTap: () => _pickSampleImage(asset),
@@ -389,7 +361,7 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
             if (_maxZoom > _minZoom)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
-                child: _ZoomArcControl(
+                child: _ZoomRulerControl(
                   min: _minZoom,
                   max: _maxZoom,
                   value: _zoomLevel,
@@ -397,17 +369,20 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _GalleryShortcut(onTap: _pickFromGallery),
-                  _ShutterButton(onTap: _capturing ? null : _capture),
-                  _ToolbarIcon(
-                    icon: _flashOn ? Icons.flash_on : Icons.flash_off_outlined,
-                    onTap: _toggleFlash,
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _GalleryShortcut(onTap: _pickFromGallery),
+                    _ShutterButton(onTap: _capturing ? null : _capture),
+                    _ToolbarIcon(
+                      icon: _flashOn ? Icons.flash_on : Icons.flash_off_outlined,
+                      onTap: _toggleFlash,
+                    ),
+                  ],
+                ),
               ),
             ),
             Padding(
@@ -578,43 +553,88 @@ class _GalleryShortcut extends StatelessWidget {
   }
 }
 
-/// iOS-style curved zoom dial: a dotted arc from [min] to [max] with a
-/// draggable pill showing the current multiplier, matching the native
-/// Camera app's zoom control instead of a plain straight slider.
-class _ZoomArcControl extends StatelessWidget {
-  const _ZoomArcControl({required this.min, required this.max, required this.value, required this.onChanged});
+/// Zoom control matching a light "pill" card: quick-select 1x/2x/3x chips
+/// on top, and a continuous tick-mark ruler below (draggable) covering the
+/// full [min]-[max] range so values between presets, and above 3x up to
+/// [max], stay reachable.
+class _ZoomRulerControl extends StatelessWidget {
+  const _ZoomRulerControl({required this.min, required this.max, required this.value, required this.onChanged});
 
   final double min;
   final double max;
   final double value;
   final ValueChanged<double> onChanged;
 
-  static const _width = 220.0;
-  static const _height = 64.0;
+  static const _presets = [1.0, 2.0, 3.0];
+  static const _rulerWidth = 260.0;
 
-  void _handle(Offset localPosition) {
-    final t = (localPosition.dx / _width).clamp(0.0, 1.0);
+  void _handle(double localX) {
+    final t = (localX / _rulerWidth).clamp(0.0, 1.0);
     onChanged(min + t * (max - min));
   }
 
   @override
   Widget build(BuildContext context) {
+    final presets = _presets.where((p) => p >= min && p <= max).toList();
     final t = (max > min) ? ((value - min) / (max - min)).clamp(0.0, 1.0) : 0.0;
     return Center(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (details) => _handle(details.localPosition),
-        onHorizontalDragUpdate: (details) => _handle(details.localPosition),
-        child: SizedBox(
-          width: _width,
-          height: _height,
-          child: CustomPaint(
-            painter: _ZoomArcPainter(
-              t: t,
-              minLabel: '${min.toStringAsFixed(0)}x',
-              maxLabel: '${max.toStringAsFixed(0)}x',
-              valueLabel: '${value.toStringAsFixed(1)}x',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final p in presets) ...[
+                  _ZoomPresetChip(label: '${p.toStringAsFixed(0)}x', selected: (value - p).abs() < 0.15, onTap: () => onChanged(p)),
+                  if (p != presets.last) const SizedBox(width: 10),
+                ],
+              ],
             ),
+            const SizedBox(height: 10),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) => _handle(details.localPosition.dx),
+              onHorizontalDragUpdate: (details) => _handle(details.localPosition.dx),
+              child: SizedBox(
+                width: _rulerWidth,
+                height: 20,
+                child: CustomPaint(painter: _ZoomRulerPainter(t: t)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ZoomPresetChip extends StatelessWidget {
+  const _ZoomPresetChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF4CAF50).withValues(alpha: 0.28) : Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? const Color(0xFF7ED184) : Colors.white.withValues(alpha: 0.28), width: 1.4),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? const Color(0xFFA8F0AC) : Colors.white70,
           ),
         ),
       ),
@@ -622,68 +642,33 @@ class _ZoomArcControl extends StatelessWidget {
   }
 }
 
-class _ZoomArcPainter extends CustomPainter {
-  _ZoomArcPainter({required this.t, required this.minLabel, required this.maxLabel, required this.valueLabel});
+class _ZoomRulerPainter extends CustomPainter {
+  _ZoomRulerPainter({required this.t});
 
   final double t;
-  final String minLabel;
-  final String maxLabel;
-  final String valueLabel;
-
-  static Offset _pointOnArc(Size size, double t) {
-    final p0 = Offset(size.width * 0.06, size.height * 0.92);
-    final p2 = Offset(size.width * 0.94, size.height * 0.92);
-    final pc = Offset(size.width * 0.5, size.height * 0.02);
-    final u = 1 - t;
-    return Offset(
-      u * u * p0.dx + 2 * u * t * pc.dx + t * t * p2.dx,
-      u * u * p0.dy + 2 * u * t * pc.dy + t * t * p2.dy,
-    );
-  }
-
-  void _drawLabel(
-    Canvas canvas,
-    String text,
-    Offset center, {
-    Color color = Colors.white70,
-    FontWeight weight = FontWeight.w500,
-    double fontSize = 12,
-  }) {
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: TextStyle(color: color, fontSize: fontSize, fontWeight: weight)),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
-  }
+  static const _tickCount = 40;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final dotPaint = Paint()..color = Colors.white.withValues(alpha: 0.8);
-    const dotCount = 26;
-    for (var i = 0; i <= dotCount; i++) {
-      canvas.drawCircle(_pointOnArc(size, i / dotCount), 1.5, dotPaint);
+    final tickPaint = Paint()..color = Colors.white.withValues(alpha: 0.5);
+    for (var i = 0; i <= _tickCount; i++) {
+      final x = size.width * i / _tickCount;
+      final isMid = i == _tickCount ~/ 2;
+      tickPaint.strokeWidth = isMid ? 1.6 : 1;
+      canvas.drawLine(Offset(x, size.height * 0.3), Offset(x, size.height * (isMid ? 0.9 : 0.7)), tickPaint);
     }
 
-    _drawLabel(canvas, minLabel, _pointOnArc(size, 0) + const Offset(0, 12), color: Colors.white60, fontSize: 11);
-    _drawLabel(canvas, maxLabel, _pointOnArc(size, 1) + const Offset(0, 12), color: Colors.white60, fontSize: 11);
-
-    final bubbleCenter = _pointOnArc(size, t);
-    final bubbleRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: bubbleCenter, width: 48, height: 26),
-      const Radius.circular(13),
-    );
-    canvas.drawRRect(bubbleRect, Paint()..color = Colors.black.withValues(alpha: 0.55));
-    canvas.drawRRect(
-      bubbleRect,
+    final markerX = size.width * t;
+    canvas.drawLine(
+      Offset(markerX, 0),
+      Offset(markerX, size.height),
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.4)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
+        ..color = const Color(0xFF4CAF50)
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round,
     );
-    _drawLabel(canvas, valueLabel, bubbleCenter, color: Colors.white, weight: FontWeight.w700, fontSize: 13);
   }
 
   @override
-  bool shouldRepaint(covariant _ZoomArcPainter oldDelegate) =>
-      oldDelegate.t != t || oldDelegate.valueLabel != valueLabel;
+  bool shouldRepaint(covariant _ZoomRulerPainter oldDelegate) => oldDelegate.t != t;
 }

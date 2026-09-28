@@ -35,8 +35,23 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   bool _submitting = false;
   bool _closeReady = false;
   Timer? _closeTimer;
+  Timer? _messageTimer;
   Package? _annualPackage;
   Package? _monthlyPackage;
+
+  // A regular SnackBar targets the ScaffoldMessenger of the page that opened
+  // this sheet, whose overlay sits *below* this modal route — so it renders
+  // invisibly behind the sheet instead of on top of it. Showing feedback as
+  // part of the sheet's own content avoids that entirely.
+  String? _message;
+
+  void _showMessage(String text) {
+    _messageTimer?.cancel();
+    setState(() => _message = text);
+    _messageTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _message = null);
+    });
+  }
 
   @override
   void initState() {
@@ -67,6 +82,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   @override
   void dispose() {
     _closeTimer?.cancel();
+    _messageTimer?.cancel();
     super.dispose();
   }
 
@@ -74,9 +90,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     final isYearly = _plan == 'yearly';
     final package = isYearly ? _annualPackage : _monthlyPackage;
     if (package == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Pricing isn't available right now — please try again shortly.")),
-      );
+      _showMessage("Pricing isn't available right now — please try again shortly.");
       return;
     }
 
@@ -93,23 +107,15 @@ class _PaywallSheetState extends State<_PaywallSheet> {
           const SnackBar(content: Text("You're on Pro now — enjoy the full experience.")),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Purchase went through, but Pro isn't active — try Restore Purchases.")),
-        );
+        _showMessage("Purchase went through, but Pro isn't active — try Restore Purchases.");
       }
     } on PlatformException catch (e) {
       final errorCode = PurchasesErrorHelper.getErrorCode(e);
       if (errorCode != PurchasesErrorCode.purchaseCancelledError && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Purchase error: ${e.message ?? e.code}')),
-        );
+        _showMessage('Purchase error: ${e.message ?? e.code}');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Purchase error: $e')),
-        );
-      }
+      if (mounted) _showMessage('Purchase error: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -160,29 +166,60 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                 borderRadius: BorderRadius.circular(28),
               ),
               clipBehavior: Clip.antiAlias,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Go Pro',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
+              // The card's own height is set by fixed top/bottom offsets from the
+              // screen edges, so it's often taller than the content needs — on a
+              // tall phone that left everything bunched at the top with dead space
+              // below. Centering the content (via the min-height constraint) fills
+              // that space evenly instead, while still scrolling if it doesn't fit.
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight - 44),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Go Pro',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 23, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft, fontSize: 15),
                     ),
+                    if (_message case final message?) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          message,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error, fontSize: 13),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     for (final benefit in _benefits) ...[
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Row(
                           children: [
-                            Icon(benefit.icon, color: AppColors.ink, size: 18),
+                            Icon(benefit.icon, color: AppColors.ink, size: 19),
                             const SizedBox(width: 10),
-                            Expanded(child: Text(benefit.label, style: Theme.of(context).textTheme.bodyMedium)),
+                            Expanded(
+                              child: Text(
+                                benefit.label,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 15),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -223,10 +260,11 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                       Text(
                         '3 days free, then ${_annualPackage?.storeProduct.priceString ?? '\$59.99'}/year. Cancel anytime.',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: AppColors.inkSoft, fontStyle: FontStyle.italic),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.inkSoft,
+                              fontStyle: FontStyle.italic,
+                              fontSize: 13,
+                            ),
                       ),
                     SizedBox(
                       width: double.infinity,
@@ -241,7 +279,10 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                                   height: 20,
                                   child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ink),
                                 )
-                              : Text(isYearly ? 'Start Free Trial' : 'Continue'),
+                              : Text(
+                                  isYearly ? 'Start Free Trial' : 'Continue',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                                ),
                         ),
                       ),
                     ),
@@ -249,11 +290,14 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                     Center(
                       child: TextButton(
                         onPressed: () => restorePurchases(context),
-                        child: const Text('Restore Purchases'),
+                        child: const Text('Restore Purchases', style: TextStyle(fontSize: 14)),
                       ),
                     ),
-                  ],
-                ),
+                          ],
+                        ),
+                      ),
+                    );
+                },
               ),
             ),
           ),
@@ -314,16 +358,16 @@ class _PlanCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14)),
+            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16)),
             const SizedBox(height: 6),
-            Text(price, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16)),
+            Text(price, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 19)),
             const SizedBox(height: 2),
             Text(
               caption,
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
-                  ?.copyWith(fontSize: 11, color: selected ? AppColors.clay : AppColors.inkSoft),
+                  ?.copyWith(fontSize: 12.5, color: selected ? AppColors.clay : AppColors.inkSoft),
             ),
           ],
         ),

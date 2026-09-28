@@ -122,7 +122,10 @@ class _AskPageState extends State<AskPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         leading: widget.embedded
@@ -133,6 +136,7 @@ class _AskPageState extends State<AskPage> {
               ),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -142,11 +146,6 @@ class _AskPageState extends State<AskPage> {
                 Text(
                   'Ask about this painting',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Get answers about the artwork, artist, style, and more.',
-                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 if (_isPro) ...[
                   const SizedBox(height: 8),
@@ -167,7 +166,7 @@ class _AskPageState extends State<AskPage> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 40),
                       child: Text(
-                        'Ask anything about "${widget.painting.title}" — try one of the suggestions below.',
+                        'Get answers about the artwork — try one of the suggestions below.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
                       ),
@@ -295,6 +294,7 @@ class _AskPageState extends State<AskPage> {
           ),
           ],
         ],
+      ),
       ),
     );
   }
