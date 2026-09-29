@@ -4,14 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/purchases.dart';
 import '../../../../core/services/user_data_repository.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../settings/presentation/pages/sign_in_page.dart';
 
 /// Shows the Pro paywall as a dialog-style sheet: the triggering screen stays
 /// visible (dimmed) behind it, with a close control over that reveal and a
 /// rounded card below carrying the offer. [subtitle] ties the pitch to
 /// whatever the user just tapped, e.g. "Unlock the 4 hidden details in this painting."
+///
+/// A guest sees the full offer immediately — sign-in is only required once
+/// they actually tap to subscribe (see [_PaywallSheetState._continue]),
+/// since Pro status is tied to a real account so it can follow them across
+/// devices.
 Future<void> showPaywallSheet(BuildContext context, {String subtitle = 'Unlock the full art experience.'}) {
   return showModalBottomSheet(
     context: context,
@@ -86,7 +93,67 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     super.dispose();
   }
 
+  /// Shows a "sign in to continue" dialog and, if the user taps through and
+  /// signs in successfully, returns true. Cancelling either the dialog or the
+  /// sign-in flow returns false so [_continue] can bail out.
+  Future<bool> _promptSignIn() async {
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 10),
+        contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        title: Text(
+          'Sign in to continue',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          "You'll need an account so your Pro subscription follows you across devices.",
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft, fontSize: 14.5),
+        ),
+        actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ElevatedButton(
+                onPressed: () async {
+                  final signedIn = await Navigator.of(dialogContext).push<bool>(
+                    MaterialPageRoute(builder: (_) => const SignInPage()),
+                  );
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop(signedIn == true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.amber,
+                  foregroundColor: AppColors.ink,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 0,
+                ),
+                child: const Text('Sign in', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                style: TextButton.styleFrom(foregroundColor: AppColors.inkSoft),
+                child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return proceed == true;
+  }
+
   Future<void> _continue() async {
+    if (!AuthService.isSignedIn) {
+      final signedIn = await _promptSignIn();
+      if (!signedIn || !mounted) return;
+    }
+
     final isYearly = _plan == 'yearly';
     final package = isYearly ? _annualPackage : _monthlyPackage;
     if (package == null) {
@@ -139,7 +206,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 12, 16, 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -181,14 +248,44 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                         mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Go Pro',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 23, fontWeight: FontWeight.w700),
-                    ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Go Pro',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontSize: 23, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => restorePurchases(context),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.clay,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  ),
+                                  child: const Text(
+                                    'Restore Purchase',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
                     const SizedBox(height: 4),
                     Text(
                       widget.subtitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft, fontSize: 15),
+                    ),
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/paywall.webp',
+                        width: double.infinity,
+                        height: 160,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                     if (_message case final message?) ...[
                       const SizedBox(height: 12),
@@ -284,13 +381,6 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                                 ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => restorePurchases(context),
-                        child: const Text('Restore Purchases', style: TextStyle(fontSize: 14)),
                       ),
                     ),
                           ],

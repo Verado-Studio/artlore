@@ -10,6 +10,7 @@ class SettingsTile extends StatelessWidget {
     this.value,
     this.onTap,
     this.showDivider = true,
+    this.color,
   });
 
   final IconData icon;
@@ -18,6 +19,10 @@ class SettingsTile extends StatelessWidget {
   final VoidCallback? onTap;
   final bool showDivider;
 
+  /// Overrides the icon/label color — used for destructive actions like
+  /// "Delete account".
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -25,12 +30,12 @@ class SettingsTile extends StatelessWidget {
         ListTile(
           onTap: onTap,
           contentPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-          leading: Icon(icon, color: AppColors.ink, size: 24),
+          leading: Icon(icon, color: color ?? AppColors.ink, size: 24),
           title: Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 17),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 17, color: color),
           ),
           trailing: value != null
               ? ConstrainedBox(

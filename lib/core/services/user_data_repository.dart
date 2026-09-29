@@ -193,18 +193,43 @@ class UserDataRepository {
     await doc.set({'isPro': value}, SetOptions(merge: true));
   }
 
+  // Kept in memory so every screen picks up a depth change the instant it's
+  // made in Settings, instead of each one re-awaiting its own Firestore
+  // round-trip (which was showing the old depth for a few seconds on the
+  // very next Result screen).
+  static String? _cachedDepth;
+
+  /// The last known default depth, if any screen has already loaded or set
+  /// one this session — lets a page seed its initial state synchronously
+  /// instead of starting from a hardcoded guess while the real value loads.
+  static String? get cachedDepth => _cachedDepth;
+
   static Future<String> defaultDepth() async {
+    final cached = _cachedDepth;
+    if (cached != null) return cached;
     await _awaitMigration();
     final doc = _doc;
-    if (doc == null) return AppPreferences.defaultDepth();
-    final snapshot = await doc.get();
-    return (snapshot.data()?['defaultDepth'] as String?) ?? 'Simple';
+    final value = doc == null
+        ? await AppPreferences.defaultDepth()
+        : (await doc.get()).data()?['defaultDepth'] as String? ?? 'Simple';
+    _cachedDepth = value;
+    return value;
   }
 
   static Future<void> setDefaultDepth(String value) async {
+    _cachedDepth = value;
     await _awaitMigration();
     final doc = _doc;
     if (doc == null) return AppPreferences.setDefaultDepth(value);
     await doc.set({'defaultDepth': value}, SetOptions(merge: true));
+  }
+
+  /// Permanently deletes this account's Firestore document (saved paintings,
+  /// Pro status, preferences) — called right before the Firebase Auth user
+  /// itself is deleted, while the account can still authenticate the delete.
+  static Future<void> deleteAllData() async {
+    final doc = _doc;
+    if (doc == null) return;
+    await doc.delete();
   }
 }

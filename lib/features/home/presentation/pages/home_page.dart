@@ -129,41 +129,48 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 12),
             _ArtFactCard(fact: artFacts[_factIndex]),
             const SizedBox(height: 20),
-            SizedBox(
-              height: 190,
-              child: recent.isEmpty
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'No paintings yet — try a sample:',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
-                        ),
-                        const SizedBox(height: 10),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              for (final asset in sampleImages) ...[
-                                Expanded(child: _HomeSampleThumb(asset: asset, onTap: () => _pickSample(asset))),
-                                if (asset != sampleImages.last) const SizedBox(width: 12),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    )
-                  : ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: recent.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 14),
-                      itemBuilder: (context, i) => RecentScanCard(
-                        painting: recent[i],
+            if (recent.isEmpty)
+              SizedBox(
+                height: 190,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'No paintings yet — try a sample:',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          for (final asset in sampleImages) ...[
+                            Expanded(child: _HomeSampleThumb(asset: asset, onTap: () => _pickSample(asset))),
+                            if (asset != sampleImages.last) const SizedBox(width: 12),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Column(
+                children: [
+                  for (final painting in recent) ...[
+                    SizedBox(
+                      height: 240,
+                      width: double.infinity,
+                      child: RecentScanCard(
+                        painting: painting,
                         onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => ResultPage(painting: recent[i])),
+                          MaterialPageRoute(builder: (_) => ResultPage(painting: painting)),
                         ),
                       ),
                     ),
-            ),
+                    const SizedBox(height: 16),
+                  ],
+                ],
+              ),
           ],
         ),
       ),

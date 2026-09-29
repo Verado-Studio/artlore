@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/models/painting.dart';
@@ -22,88 +24,89 @@ class CollectionGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ScannedImage(
-                    seed: painting.imageSeed,
-                    imagePath: painting.scannedImagePath,
-                    assetPath: painting.assetImagePath,
-                    borderRadius: 16,
-                    showFrame: false,
-                  ),
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: InkWell(
-                      onTap: onToggleFavorite,
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.4), shape: BoxShape.circle),
-                        child: Icon(
-                          painting.isFavorite ? Icons.favorite : Icons.favorite_border,
-                          size: 15,
-                          color: painting.isFavorite ? AppColors.clay : Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: InkWell(
-                      onTap: onDelete,
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.4), shape: BoxShape.circle),
-                        child: const Icon(Icons.close, size: 15, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ScannedImage(
+              seed: painting.imageSeed,
+              imagePath: painting.scannedImagePath,
+              assetPath: painting.assetImagePath,
+              borderRadius: 0,
+              showFrame: false,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            painting.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 14),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${painting.artist} · ${painting.year}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.clay, fontWeight: FontWeight.w600),
-          ),
-          if (painting.movement.isNotEmpty && painting.movement != '—') ...[
-            const SizedBox(height: 3),
-            Row(
-              children: [
-                const Icon(Icons.palette_outlined, size: 12, color: AppColors.inkSoft),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    painting.movement,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft, fontSize: 11),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.55)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          painting.title,
+                          maxLines: 2,
+                          style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, fontSize: 16),
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.inkSoft),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                painting.year,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: AppColors.inkSoft, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: InkWell(
+                onTap: onToggleFavorite,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.4), shape: BoxShape.circle),
+                  child: Icon(
+                    painting.isFavorite ? Icons.favorite : Icons.favorite_border,
+                    size: 15,
+                    color: painting.isFavorite ? AppColors.clay : Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: InkWell(
+                onTap: onDelete,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.4), shape: BoxShape.circle),
+                  child: const Icon(Icons.close, size: 15, color: Colors.white),
+                ),
+              ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }

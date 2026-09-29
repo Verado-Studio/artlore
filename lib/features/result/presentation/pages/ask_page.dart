@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/models/painting.dart';
+import '../../../../core/services/ask_context.dart';
 import '../../../../core/services/painting_chat_service.dart';
 import '../../../../core/services/painting_chat_store.dart';
 import '../../../../core/services/user_data_repository.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/scanned_image.dart';
 import '../../../paywall/presentation/pages/paywall_page.dart';
 
 class AskPage extends StatefulWidget {
@@ -26,10 +28,18 @@ class _AskPageState extends State<AskPage> {
   bool _sending = false;
   bool _isPro = false;
 
+  /// Which scanned painting is currently being chatted about — only ever
+  /// changed from [widget.painting] in embedded mode (the bottom-nav Ask
+  /// tab), where the picker below lets the user switch between their scans.
+  Painting? _selected;
+  List<Painting> _savedPaintings = [];
+
   /// Ask is Pro-only, capped at this many questions per painting.
   static const _maxQuestionsPerPainting = 10;
 
-  List<ChatTurn> get _messages => PaintingChatStore.historyFor(widget.painting.title);
+  Painting get _painting => _selected ?? widget.painting;
+
+  List<ChatTurn> get _messages => PaintingChatStore.historyFor(_painting.title);
 
   int get _questionsAsked => _messages.where((m) => m.fromUser).length;
 
@@ -43,6 +53,7 @@ class _AskPageState extends State<AskPage> {
   void initState() {
     super.initState();
     _loadIsPro();
+    if (widget.embedded) _loadSavedPaintings();
   }
 
   Future<void> _loadIsPro() async {
@@ -50,11 +61,29 @@ class _AskPageState extends State<AskPage> {
     if (mounted) setState(() => _isPro = isPro);
   }
 
+  Future<void> _loadSavedPaintings() async {
+    final saved = await UserDataRepository.savedPaintings();
+    if (!mounted) return;
+    setState(() => _savedPaintings = saved.reversed.toList());
+  }
+
+  void _selectPainting(Painting painting) {
+    if (painting.title == _painting.title) return;
+    setState(() {
+      _selected = painting;
+      _sending = false;
+    });
+    AskContext.current.value = painting;
+  }
+
   @override
   void didUpdateWidget(covariant AskPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.painting.title != widget.painting.title && mounted) {
-      setState(() => _sending = false);
+      setState(() {
+        _sending = false;
+        _selected = null;
+      });
     }
   }
 
@@ -70,7 +99,7 @@ class _AskPageState extends State<AskPage> {
       );
       return;
     }
-    final title = widget.painting.title;
+    final title = _painting.title;
     setState(() {
       PaintingChatStore.append(title, ChatTurn(text, true));
       _sending = true;
@@ -80,7 +109,7 @@ class _AskPageState extends State<AskPage> {
 
     try {
       final reply = await PaintingChatService.ask(
-        painting: widget.painting,
+        painting: _painting,
         question: text,
         previousInteractionId: PaintingChatStore.interactionIdFor(title),
       );
@@ -157,6 +186,67 @@ class _AskPageState extends State<AskPage> {
               ],
             ),
           ),
+          if (widget.embedded && _savedPaintings.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SizedBox(
+                height: 100,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: _savedPaintings.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                  itemBuilder: (context, i) {
+                    final painting = _savedPaintings[i];
+                    final selected = painting.title == _painting.title;
+                    return GestureDetector(
+                      onTap: () => _selectPainting(painting),
+                      child: SizedBox(
+                        width: 60,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: selected ? AppColors.amber : Colors.transparent,
+                                  width: 2.4,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(9),
+                                child: ScannedImage(
+                                  seed: painting.imageSeed,
+                                  imagePath: painting.scannedImagePath,
+                                  assetPath: painting.assetImagePath,
+                                  showFrame: false,
+                                  borderRadius: 0,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              painting.title,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontSize: 10.5,
+                                    color: selected ? AppColors.ink : AppColors.inkSoft,
+                                    fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
           if (!_isPro)
             Expanded(child: _LockedAskState(onUnlock: () => showPaywallSheet(context, subtitle: 'Unlock Ask to chat about this painting.')))
           else ...[

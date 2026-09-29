@@ -149,6 +149,19 @@ class AuthService {
     await RevenueCatService.syncIdentity();
   }
 
+  /// Permanently deletes the signed-in account: its Firestore data first
+  /// (while it can still authenticate that delete), then the Firebase Auth
+  /// user itself. Throws [FirebaseAuthException] with code
+  /// 'requires-recent-login' if the sign-in session is too old — the caller
+  /// should ask the user to sign in again and retry.
+  static Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous) return;
+    await UserDataRepository.deleteAllData();
+    await user.delete();
+    await RevenueCatService.syncIdentity();
+  }
+
   /// Turns a [FirebaseAuthException] into copy a user can actually act on.
   static String friendlyMessage(FirebaseAuthException error) {
     switch (error.code) {
@@ -169,6 +182,8 @@ class AuthService {
       case 'popup-closed-by-user':
       case 'cancelled-popup-request':
         return 'Sign-in was cancelled.';
+      case 'requires-recent-login':
+        return 'For your security, please sign out and sign back in, then try again.';
       default:
         return error.message ?? 'Something went wrong. Please try again.';
     }

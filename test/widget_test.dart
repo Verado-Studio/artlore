@@ -34,7 +34,7 @@ void main() {
     await tester.tap(find.text('Collection'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('My Collection'), findsOneWidget);
+    expect(find.text('Saved artworks'), findsOneWidget);
 
     await tester.tap(find.text('Ask'));
     await tester.pumpAndSettle();

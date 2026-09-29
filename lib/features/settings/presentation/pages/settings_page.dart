@@ -22,7 +22,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  String _depth = 'Simple';
+  String _depth = UserDataRepository.cachedDepth ?? 'Simple';
   User? _user;
   late final StreamSubscription<User?> _authSubscription;
 
@@ -69,6 +69,53 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
     await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const SignInPage()));
+  }
+
+  Future<void> _handleDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This permanently deletes your account and all your data — your Collection, Pro status, and '
+          'preferences. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      await AuthService.deleteAccount();
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AppShell()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AuthService.friendlyMessage(e))));
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't delete your account — please try again.")),
+      );
+    }
   }
 
   void _pickDepth() {
@@ -166,8 +213,16 @@ class _SettingsPageState extends State<SettingsPage> {
                     label: signedIn ? 'Signed in' : 'Sign in',
                     value: signedInLabel,
                     onTap: _handleSignInTap,
-                    showDivider: false,
+                    showDivider: signedIn,
                   ),
+                  if (signedIn)
+                    SettingsTile(
+                      icon: Icons.delete_outline,
+                      label: 'Delete account',
+                      color: AppColors.error,
+                      onTap: _handleDeleteAccount,
+                      showDivider: false,
+                    ),
                 ],
               ),
             ),

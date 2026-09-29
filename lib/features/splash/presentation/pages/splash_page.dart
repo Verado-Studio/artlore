@@ -43,7 +43,7 @@ class _SplashPageState extends State<SplashPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/splash.jfif', fit: BoxFit.cover),
+          Image.asset('assets/splash.webp', fit: BoxFit.cover),
           Container(color: AppColors.ink.withValues(alpha: 0.55)),
           Center(
             child: Column(

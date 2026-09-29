@@ -100,25 +100,61 @@ class _BottomBar extends StatelessWidget {
   final ValueChanged<int> onTabSelected;
   final VoidCallback onScanTap;
 
+  static const double _barHeight = 64;
+  static const double _notchRadius = 36;
+  static const double _buttonTop = -34;
+
   @override
   Widget build(BuildContext context) {
-    return BottomAppBar(
+    return ColoredBox(
       color: AppColors.background,
-      height: 76,
-      padding: EdgeInsets.zero,
-      child: Row(
-        children: [
-          _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home', selected: currentIndex == 0, onTap: () => onTabSelected(0)),
-          _NavItem(
-            icon: Icons.grid_view_outlined,
-            activeIcon: Icons.grid_view_rounded,
-            label: 'Collection',
-            selected: currentIndex == 1,
-            onTap: () => onTabSelected(1),
-          ),
-          Expanded(
-            child: Transform.translate(
-              offset: const Offset(0, -16),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + MediaQuery.of(context).padding.bottom),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            ClipPath(
+              clipper: const _NotchedBarClipper(radius: 32, notchRadius: _notchRadius),
+              child: Container(
+                height: _barHeight,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 8)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home', selected: currentIndex == 0, onTap: () => onTabSelected(0)),
+                    _NavItem(
+                      icon: Icons.grid_view_outlined,
+                      activeIcon: Icons.grid_view_rounded,
+                      label: 'Collection',
+                      selected: currentIndex == 1,
+                      onTap: () => onTabSelected(1),
+                    ),
+                    const Expanded(child: SizedBox()),
+                    _NavItem(
+                      icon: Icons.chat_bubble_outline,
+                      activeIcon: Icons.chat_bubble,
+                      label: 'Ask',
+                      selected: currentIndex == 2,
+                      onTap: () => onTabSelected(2),
+                    ),
+                    _NavItem(
+                      icon: Icons.person_outline,
+                      activeIcon: Icons.person,
+                      label: 'Profile',
+                      selected: currentIndex == 3,
+                      onTap: () => onTabSelected(3),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: _buttonTop,
               child: InkWell(
                 onTap: onScanTap,
                 customBorder: const CircleBorder(),
@@ -132,29 +168,36 @@ class _BottomBar extends StatelessWidget {
                       BoxShadow(color: AppColors.amber.withValues(alpha: 0.4), blurRadius: 14, offset: const Offset(0, 6)),
                     ],
                   ),
-                  child: const Icon(Icons.camera_alt, color: AppColors.ink),
+                  child: const Icon(Icons.camera_alt, color: Colors.white),
                 ),
               ),
             ),
-          ),
-          _NavItem(
-            icon: Icons.chat_bubble_outline,
-            activeIcon: Icons.chat_bubble,
-            label: 'Ask',
-            selected: currentIndex == 2,
-            onTap: () => onTabSelected(2),
-          ),
-          _NavItem(
-            icon: Icons.person_outline,
-            activeIcon: Icons.person,
-            label: 'Profile',
-            selected: currentIndex == 3,
-            onTap: () => onTabSelected(3),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Cuts a circular notch out of the top-center of an otherwise fully rounded
+/// bar, so the raised scan button nests into it instead of floating
+/// disconnected above the bar with nothing behind it.
+class _NotchedBarClipper extends CustomClipper<Path> {
+  const _NotchedBarClipper({required this.radius, required this.notchRadius});
+
+  final double radius;
+  final double notchRadius;
+
+  @override
+  Path getClip(Size size) {
+    final base = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)));
+    final notch = Path()..addOval(Rect.fromCircle(center: Offset(size.width / 2, 0), radius: notchRadius));
+    return Path.combine(PathOperation.difference, base, notch);
+  }
+
+  @override
+  bool shouldReclip(covariant _NotchedBarClipper oldClipper) =>
+      oldClipper.radius != radius || oldClipper.notchRadius != notchRadius;
 }
 
 class _NavItem extends StatelessWidget {
@@ -174,7 +217,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.clay : AppColors.inkSoft;
+    final color = selected ? AppColors.amber : AppColors.inkSoft;
     return Expanded(
       child: InkWell(
         onTap: onTap,
