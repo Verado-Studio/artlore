@@ -40,8 +40,6 @@ class _PaywallSheet extends StatefulWidget {
 class _PaywallSheetState extends State<_PaywallSheet> {
   String _plan = 'yearly';
   bool _submitting = false;
-  bool _closeReady = false;
-  Timer? _closeTimer;
   Timer? _messageTimer;
   Package? _annualPackage;
   Package? _monthlyPackage;
@@ -63,9 +61,6 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   @override
   void initState() {
     super.initState();
-    _closeTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _closeReady = true);
-    });
     _fetchOfferings();
   }
 
@@ -88,7 +83,6 @@ class _PaywallSheetState extends State<_PaywallSheet> {
 
   @override
   void dispose() {
-    _closeTimer?.cancel();
     _messageTimer?.cancel();
     super.dispose();
   }
@@ -210,14 +204,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  AnimatedOpacity(
-                    opacity: _closeReady ? 1 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: _RoundIcon(
-                      icon: Icons.close,
-                      onTap: _closeReady ? () => Navigator.of(context).pop() : () {},
-                    ),
-                  ),
+                  _RoundIcon(icon: Icons.close, onTap: () => Navigator.of(context).pop()),
                 ],
               ),
             ),

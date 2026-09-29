@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../models/painting.dart';
 import 'purchases.dart';
 import 'user_data_repository.dart';
 
@@ -29,6 +30,10 @@ class AuthService {
   static FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
 
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  /// Like [authStateChanges], but also fires on profile updates such as the
+  /// display name being set right after sign-up.
+  static Stream<User?> get userChanges => _auth.userChanges();
 
   static User? get currentUser => _auth.currentUser;
 
@@ -73,24 +78,45 @@ class AuthService {
     return _auth.signInWithCredential(credential);
   }
 
+  /// Unlike social sign-in, an email that's already registered is an error
+  /// here — falling through to a sign-in attempt with the new password was
+  /// surfacing as a misleading "Incorrect email or password".
   static Future<void> signUp({required String email, required String password, required String displayName}) async {
-    final credential = await _upgradeOrSignIn(EmailAuthProvider.credential(email: email, password: password));
+    final current = _auth.currentUser;
+    final credential = current != null && current.isAnonymous
+        ? await current.linkWithCredential(EmailAuthProvider.credential(email: email, password: password))
+        : await _auth.createUserWithEmailAndPassword(email: email, password: password);
     await credential.user?.updateDisplayName(displayName);
     await UserDataRepository.migrateLocalDataIfNeeded();
     await RevenueCatService.syncIdentity();
   }
 
-  static Future<void> signIn({required String email, required String password}) async {
-    // A plain sign-in is always into a pre-existing separate account, so
-    // there's no anonymous uid worth preserving here — `_upgradeOrSignIn`
-    // would just hit `email-already-in-use` and fall through to the same
-    // `signInWithCredential` call anyway.
-    await _auth.signInWithEmailAndPassword(email: email, password: password);
+  /// Reads the current guest's scans before an identity switch, so they can
+  /// be merged into the account being signed into afterwards.
+  static Future<List<Painting>> _guestScans() async {
+    final current = _auth.currentUser;
+    if (current == null || !current.isAnonymous) return const [];
+    try {
+      return await UserDataRepository.savedPaintings();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> _finishSignIn(List<Painting> guestScans) async {
     await UserDataRepository.migrateLocalDataIfNeeded();
+    await UserDataRepository.mergeGuestScans(guestScans);
     await RevenueCatService.syncIdentity();
   }
 
+  static Future<void> signIn({required String email, required String password}) async {
+    final guestScans = await _guestScans();
+    await _auth.signInWithEmailAndPassword(email: email, password: password);
+    await _finishSignIn(guestScans);
+  }
+
   static Future<void> signInWithGoogle() async {
+    final guestScans = await _guestScans();
     if (kIsWeb) {
       final current = _auth.currentUser;
       if (current != null && current.isAnonymous) {
@@ -115,8 +141,7 @@ class AuthService {
       );
       await _upgradeOrSignIn(credential);
     }
-    await UserDataRepository.migrateLocalDataIfNeeded();
-    await RevenueCatService.syncIdentity();
+    await _finishSignIn(guestScans);
   }
 
   /// Apple's OAuth 2 provider, via Firebase's own generic `signInWithProvider`
@@ -129,6 +154,7 @@ class AuthService {
     final provider = OAuthProvider('apple.com')
       ..addScope('email')
       ..addScope('name');
+    final guestScans = await _guestScans();
     final current = _auth.currentUser;
     if (current != null && current.isAnonymous) {
       try {
@@ -140,8 +166,7 @@ class AuthService {
     } else {
       await _auth.signInWithProvider(provider);
     }
-    await UserDataRepository.migrateLocalDataIfNeeded();
-    await RevenueCatService.syncIdentity();
+    await _finishSignIn(guestScans);
   }
 
   static Future<void> signOut() async {
@@ -174,9 +199,10 @@ class AuthService {
       case 'invalid-credential':
         return 'Incorrect email or password.';
       case 'email-already-in-use':
-        return 'An account already exists with that email.';
+      case 'credential-already-in-use':
+        return 'An account already exists with that email. Try signing in instead.';
       case 'weak-password':
-        return 'Choose a stronger password (at least 6 characters).';
+        return 'Choose a stronger password (at least 8 characters).';
       case 'network-request-failed':
         return 'Network error — check your connection and try again.';
       case 'popup-closed-by-user':

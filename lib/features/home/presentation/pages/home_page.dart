@@ -10,6 +10,7 @@ import '../../../../core/constants/sample_images.dart';
 import '../../../../core/models/painting.dart';
 import '../../../../core/services/app_preferences.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/scanned_image_store.dart';
 import '../../../../core/services/user_data_repository.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../collection/presentation/pages/collection_page.dart';
@@ -36,31 +37,51 @@ class _HomePageState extends State<HomePage> {
   bool _isPro = false;
   final int _factIndex = math.Random().nextInt(artFacts.length);
   late final StreamSubscription<User?> _authSubscription;
+  late final StreamSubscription<User?> _profileSubscription;
 
   @override
   void initState() {
     super.initState();
     _authSubscription = AuthService.authStateChanges.listen((_) => _loadUserData());
+    // The name is saved just after sign-up completes, so catch it arriving
+    // rather than keeping whatever was there at sign-in.
+    _profileSubscription = AuthService.userChanges.listen((user) {
+      if (mounted) setState(() => _displayName = _firstNameOf(user));
+    });
+    UserDataRepository.savedPaintingsChanged.addListener(_loadUserData);
     _loadUserData();
   }
 
   @override
   void dispose() {
     _authSubscription.cancel();
+    _profileSubscription.cancel();
+    UserDataRepository.savedPaintingsChanged.removeListener(_loadUserData);
     super.dispose();
   }
 
+  static String? _firstNameOf(User? user) {
+    final name = user?.displayName?.trim();
+    if (name == null || name.isEmpty) return null;
+    return name.split(RegExp(r'\s+')).first;
+  }
+
   Future<void> _loadUserData() async {
-    final used = await UserDataRepository.scansUsedToday();
-    final saved = await UserDataRepository.savedPaintings();
-    final isPro = await UserDataRepository.isPro();
+    final results = await Future.wait([
+      UserDataRepository.scansUsedToday(),
+      UserDataRepository.savedPaintings(),
+      UserDataRepository.isPro(),
+    ]);
+    final used = results[0] as int;
+    final saved = results[1] as List<Painting>;
+    final isPro = results[2] as bool;
     final user = AuthService.currentUser;
     if (!mounted) return;
     setState(() {
       _scansUsed = used;
-      _recentScans = saved.reversed.toList();
+      _recentScans = saved.reversed.where(hasViewableImage).toList();
       _isPro = isPro;
-      _displayName = user?.displayName?.trim().split(' ').first ?? user?.email?.split('@').first;
+      _displayName = _firstNameOf(user);
     });
   }
 
@@ -154,22 +175,19 @@ class _HomePageState extends State<HomePage> {
                 ),
               )
             else
-              Column(
-                children: [
-                  for (final painting in recent) ...[
-                    SizedBox(
-                      height: 240,
-                      width: double.infinity,
-                      child: RecentScanCard(
-                        painting: painting,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => ResultPage(painting: painting)),
-                        ),
-                      ),
+              SizedBox(
+                height: 230,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: recent.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 14),
+                  itemBuilder: (context, i) => RecentScanCard(
+                    painting: recent[i],
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => ResultPage(painting: recent[i])),
                     ),
-                    const SizedBox(height: 16),
-                  ],
-                ],
+                  ),
+                ),
               ),
           ],
         ),

@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 
 import '../models/painting.dart';
 import 'app_preferences.dart';
@@ -78,16 +78,39 @@ class UserDataRepository {
     if (inFlight != null) await inFlight;
   }
 
+  // The saved list is cached in memory (per account) so Home and Collection
+  // show a new scan instantly instead of each re-downloading the whole list,
+  // one network read after another.
+  static List<Painting>? _savedCache;
+  static String? _savedCacheUid;
+
+  /// Bumps whenever the saved list changes, so screens that are already open
+  /// (Home and Collection live on in the tab shell) can refresh right away.
+  static final ValueNotifier<int> savedPaintingsChanged = ValueNotifier(0);
+
+  static bool get _savedCacheValid => _savedCache != null && _savedCacheUid == AuthService.currentUser?.uid;
+
   static Future<List<Painting>> savedPaintings() async {
+    if (_savedCacheValid) return List.of(_savedCache!);
     await _awaitMigration();
     final doc = _doc;
-    if (doc == null) return AppPreferences.savedPaintings();
-    final snapshot = await doc.get();
-    final list = (snapshot.data()?['savedPaintingsData'] as List?) ?? const [];
-    return list.map((e) => Painting.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    final List<Painting> list;
+    if (doc == null) {
+      list = await AppPreferences.savedPaintings();
+    } else {
+      final snapshot = await doc.get();
+      final raw = (snapshot.data()?['savedPaintingsData'] as List?) ?? const [];
+      list = raw.map((e) => Painting.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    }
+    _savedCache = list;
+    _savedCacheUid = AuthService.currentUser?.uid;
+    return List.of(list);
   }
 
   static Future<void> setSavedPaintings(List<Painting> paintings) async {
+    _savedCache = List.of(paintings);
+    _savedCacheUid = AuthService.currentUser?.uid;
+    savedPaintingsChanged.value++;
     await _awaitMigration();
     final doc = _doc;
     if (doc == null) return AppPreferences.setSavedPaintings(paintings);
@@ -122,13 +145,33 @@ class UserDataRepository {
     }
     history.removeWhere((p) => p.title == painting.title);
     history.add(painting);
-    final proStatus = await isPro();
+    // The last known Pro status is fine for trimming history; a fresh server
+    // read here would hold up the scan result for no user-visible benefit.
+    final proStatus = _proCacheValid ? _cachedPro! : await isPro();
     if (!proStatus && history.length > AppPreferences.freeScanHistoryLimit) {
       final overflowCount = history.length - AppPreferences.freeScanHistoryLimit;
       for (final p in history.take(overflowCount)) {
         await ScannedImageStore.delete(p.scannedImagePath);
       }
       history.removeRange(0, overflowCount);
+    }
+    await setSavedPaintings(history);
+  }
+
+  /// Adds scans made as a guest on this device to the account just signed
+  /// into. Signing in to an existing account switches identity, which would
+  /// otherwise leave those scans behind on the guest account.
+  static Future<void> mergeGuestScans(List<Painting> guestScans) async {
+    if (guestScans.isEmpty) return;
+    final history = await savedPaintings();
+    for (final scan in guestScans) {
+      if (!history.any((p) => p.title == scan.title)) history.add(scan);
+    }
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    history.sort((a, b) => (a.scannedAt ?? epoch).compareTo(b.scannedAt ?? epoch));
+    final proStatus = await isPro();
+    if (!proStatus && history.length > AppPreferences.freeScanHistoryLimit) {
+      history.removeRange(0, history.length - AppPreferences.freeScanHistoryLimit);
     }
     await setSavedPaintings(history);
   }
@@ -167,7 +210,19 @@ class UserDataRepository {
     return (data?['scansUsedToday'] as int?) ?? 0;
   }
 
+  static bool? _cachedPro;
+  static String? _cachedProUid;
+
+  static bool get _proCacheValid => _cachedPro != null && _cachedProUid == AuthService.currentUser?.uid;
+
   static Future<bool> isPro() async {
+    final value = await _fetchIsPro();
+    _cachedPro = value;
+    _cachedProUid = AuthService.currentUser?.uid;
+    return value;
+  }
+
+  static Future<bool> _fetchIsPro() async {
     await _awaitMigration();
     final doc = _doc;
     if (doc == null) return AppPreferences.isPro();
@@ -186,6 +241,8 @@ class UserDataRepository {
   }
 
   static Future<void> setPro(bool value) async {
+    _cachedPro = value;
+    _cachedProUid = AuthService.currentUser?.uid;
     await _awaitMigration();
     await AppPreferences.setPro(value);
     final doc = _doc;
@@ -228,6 +285,8 @@ class UserDataRepository {
   /// Pro status, preferences) — called right before the Firebase Auth user
   /// itself is deleted, while the account can still authenticate the delete.
   static Future<void> deleteAllData() async {
+    _savedCache = null;
+    _cachedPro = null;
     final doc = _doc;
     if (doc == null) return;
     await doc.delete();

@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/models/painting.dart';
@@ -16,56 +14,31 @@ class RecentScanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: ClipRect(
-        child: Stack(
-          fit: StackFit.expand,
+      child: SizedBox(
+        width: 128,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ScannedImage(
-              seed: painting.imageSeed,
-              imagePath: painting.scannedImagePath,
-              assetPath: painting.assetImagePath,
-              borderRadius: 0,
-              showFrame: false,
-            ),
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: 12,
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.55)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          painting.title,
-                          maxLines: 2,
-                          style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, fontSize: 16),
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.inkSoft),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                painting.year,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: AppColors.inkSoft, fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+            SizedBox(
+              height: 128,
+              width: 128,
+              child: ScannedImage(
+                seed: painting.imageSeed,
+                imagePath: painting.scannedImagePath,
+                assetPath: painting.assetImagePath,
+                borderRadius: 16,
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              painting.title,
+              maxLines: 2,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            Text(
+              painting.artist,
+              maxLines: 2,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
             ),
           ],
         ),

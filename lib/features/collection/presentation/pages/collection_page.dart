@@ -6,17 +6,14 @@ import 'package:flutter/material.dart';
 import '../../../../core/mock/mock_paintings.dart';
 import '../../../../core/models/painting.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/scanned_image_store.dart';
 import '../../../../core/services/user_data_repository.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../result/presentation/pages/result_page.dart';
 import '../../../scan/presentation/pages/camera_page.dart';
 import '../widgets/collection_grid_item.dart';
 
-const _featured = [
-  MockPaintings.monaLisa,
-  MockPaintings.prodigalSon,
-  MockPaintings.nightWatch,
-];
+const _featured = [MockPaintings.monaLisa, MockPaintings.prodigalSon, MockPaintings.nightWatch];
 
 enum _CollectionFilter { all, favorites, recent }
 
@@ -56,6 +53,7 @@ class _CollectionPageState extends State<CollectionPage> {
   void initState() {
     super.initState();
     _authSubscription = AuthService.authStateChanges.listen((_) => _load());
+    UserDataRepository.savedPaintingsChanged.addListener(_load);
     _load();
   }
 
@@ -63,7 +61,7 @@ class _CollectionPageState extends State<CollectionPage> {
     final saved = await UserDataRepository.savedPaintings();
     if (!mounted) return;
     setState(() {
-      _items = saved.reversed.toList();
+      _items = saved.reversed.where(hasViewableImage).toList();
     });
   }
 
@@ -92,6 +90,7 @@ class _CollectionPageState extends State<CollectionPage> {
   @override
   void dispose() {
     _authSubscription.cancel();
+    UserDataRepository.savedPaintingsChanged.removeListener(_load);
     super.dispose();
   }
 
@@ -174,165 +173,155 @@ class _CollectionPageState extends State<CollectionPage> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Collection',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 26, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 16),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        onChanged: (v) => setState(() => _query = v),
-                        decoration: InputDecoration(
-                          hintText: 'Search',
-                          hintStyle: const TextStyle(color: AppColors.inkSoft),
-                          prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.inkSoft),
-                          filled: true,
-                          fillColor: AppColors.surface,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.divider),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.divider),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.clay),
-                          ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          children: [
+            Text(
+              'Collection',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 26, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 16),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      onChanged: (v) => setState(() => _query = v),
+                      decoration: InputDecoration(
+                        hintText: 'Search',
+                        hintStyle: const TextStyle(color: AppColors.inkSoft),
+                        prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.inkSoft),
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.clay),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    InkWell(
-                      onTap: _showSortSheet,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        width: 52,
-                        decoration: BoxDecoration(color: AppColors.clay, borderRadius: BorderRadius.circular(14)),
-                        child: const Icon(Icons.tune, size: 20, color: Colors.white),
-                      ),
+                  ),
+                  const SizedBox(width: 10),
+                  InkWell(
+                    onTap: _showSortSheet,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      width: 52,
+                      decoration: BoxDecoration(color: AppColors.clay, borderRadius: BorderRadius.circular(14)),
+                      child: const Icon(Icons.tune, size: 20, color: Colors.white),
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _FilterTab(
+                  label: 'All',
+                  selected: _filter == _CollectionFilter.all,
+                  onTap: () => setState(() => _filter = _CollectionFilter.all),
                 ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                const SizedBox(width: 26),
+                _FilterTab(
+                  label: 'Favorites',
+                  selected: _filter == _CollectionFilter.favorites,
+                  onTap: () => setState(() => _filter = _CollectionFilter.favorites),
+                ),
+                const SizedBox(width: 26),
+                _FilterTab(
+                  label: 'Recently added',
+                  selected: _filter == _CollectionFilter.recent,
+                  onTap: () => setState(() => _filter = _CollectionFilter.recent),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Saved artworks',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  '${filtered.length} artwork${filtered.length == 1 ? '' : 's'}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _DiscoverCard(
+              onTap: () async {
+                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CameraPage()));
+                _load();
+              },
+            ),
+            const SizedBox(height: 20),
+            if (filtered.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    _emptyMessage(),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
+                  ),
+                ),
+              )
+            else
+              Column(
                 children: [
-                  _FilterTab(
-                    label: 'All',
-                    selected: _filter == _CollectionFilter.all,
-                    onTap: () => setState(() => _filter = _CollectionFilter.all),
-                  ),
-                  const SizedBox(width: 26),
-                  _FilterTab(
-                    label: 'Favorites',
-                    selected: _filter == _CollectionFilter.favorites,
-                    onTap: () => setState(() => _filter = _CollectionFilter.favorites),
-                  ),
-                  const SizedBox(width: 26),
-                  _FilterTab(
-                    label: 'Recently added',
-                    selected: _filter == _CollectionFilter.recent,
-                    onTap: () => setState(() => _filter = _CollectionFilter.recent),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Saved artworks',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    '${filtered.length} artwork${filtered.length == 1 ? '' : 's'}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  children: [
-                    _DiscoverCard(
-                      onTap: () async {
-                        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CameraPage()));
-                        _load();
-                      },
+                  for (final painting in filtered) ...[
+                    SizedBox(
+                      height: 240,
+                      width: double.infinity,
+                      child: CollectionGridItem(
+                        painting: painting,
+                        onTap: () async {
+                          await Navigator.of(
+                            context,
+                          ).push(MaterialPageRoute(builder: (_) => ResultPage(painting: painting)));
+                          _load();
+                        },
+                        onDelete: () => _delete(painting),
+                        onToggleFavorite: () => _toggleFavorite(painting),
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                    if (filtered.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 32),
-                        child: Center(
-                          child: Text(
-                            _emptyMessage(),
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
-                          ),
-                        ),
-                      )
-                    else
-                      Column(
-                        children: [
-                          for (final painting in filtered) ...[
-                            SizedBox(
-                              height: 240,
-                              width: double.infinity,
-                              child: CollectionGridItem(
-                                painting: painting,
-                                onTap: () async {
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => ResultPage(painting: painting)),
-                                  );
-                                  _load();
-                                },
-                                onDelete: () => _delete(painting),
-                                onToggleFavorite: () => _toggleFavorite(painting),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                        ],
-                      ),
-                    if (filtered.isEmpty) ...[
-                      const SizedBox(height: 28),
-                      Text('Explore Masterpieces', style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: 230,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _featured.length,
-                          separatorBuilder: (_, _) => const SizedBox(width: 14),
-                          itemBuilder: (context, i) => _ExploreCard(
-                            painting: _featured[i],
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => ResultPage(painting: _featured[i])),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    const SizedBox(height: 16),
                   ],
+                ],
+              ),
+            if (filtered.isEmpty) ...[
+              const SizedBox(height: 28),
+              Text('Explore Masterpieces', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 230,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _featured.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 14),
+                  itemBuilder: (context, i) => _ExploreCard(
+                    painting: _featured[i],
+                    onTap: () => Navigator.of(
+                      context,
+                    ).push(MaterialPageRoute(builder: (_) => ResultPage(painting: _featured[i]))),
+                  ),
                 ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -367,10 +356,7 @@ class _FilterTab extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              Container(
-                height: 2,
-                color: selected ? AppColors.clay : Colors.transparent,
-              ),
+              Container(height: 2, color: selected ? AppColors.clay : Colors.transparent),
             ],
           ),
         ),
@@ -448,11 +434,7 @@ class _ExploreCard extends StatelessWidget {
               child: Image.asset(painting.assetImagePath!, width: 128, height: 128, fit: BoxFit.cover),
             ),
             const SizedBox(height: 8),
-            Text(
-              painting.title,
-              maxLines: 2,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text(painting.title, maxLines: 2, style: Theme.of(context).textTheme.titleMedium),
             Text(
               painting.artist,
               maxLines: 2,
@@ -464,4 +446,3 @@ class _ExploreCard extends StatelessWidget {
     );
   }
 }
-

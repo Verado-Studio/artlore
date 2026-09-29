@@ -3,6 +3,7 @@ import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../services/scanned_image_store.dart';
 import '../theme/app_colors.dart';
 import 'painting_placeholder.dart';
 
@@ -59,7 +60,7 @@ class ScannedImage extends StatelessWidget {
                       PaintingPlaceholder(seed: seed, icon: icon, showFrame: false, borderRadius: borderRadius),
                 )
               : Image.file(
-                  File(path),
+                  File(ScannedImageStore.resolve(path)),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) =>
                       PaintingPlaceholder(seed: seed, icon: icon, showFrame: false, borderRadius: borderRadius),
