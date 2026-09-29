@@ -31,6 +31,7 @@ class CollectionGridItem extends StatelessWidget {
             ScannedImage(
               seed: painting.imageSeed,
               imagePath: painting.scannedImagePath,
+              imageUrl: painting.imageUrl,
               assetPath: painting.assetImagePath,
               borderRadius: 0,
               showFrame: false,
@@ -44,7 +45,7 @@ class CollectionGridItem extends StatelessWidget {
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.55)),
+                    decoration: BoxDecoration(color: const Color(0xFFCFCBC6).withValues(alpha: 0.72)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,

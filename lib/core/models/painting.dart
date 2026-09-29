@@ -47,6 +47,7 @@ class Painting {
     required this.details,
     this.shortStories = const {},
     this.scannedImagePath,
+    this.imageUrl,
     this.assetImagePath,
     this.scannedAt,
     this.isFavorite = false,
@@ -75,6 +76,11 @@ class Painting {
   /// there's no real identification backend yet, so the rest of the data
   /// above still comes from mock content regardless of what was photographed.
   final String? scannedImagePath;
+
+  /// Download URL of this scan's photo in Firebase Storage, so the photo
+  /// shows on every device signed in to the account, not only the one that
+  /// took it. Null until the upload finishes, and for curated entries.
+  final String? imageUrl;
 
   /// A bundled app asset to show instead of a real photo — used for curated
   /// entries (e.g. "Explore Masterpieces") that have a real reference image
@@ -129,9 +135,29 @@ class Painting {
         shortStories: shortStories,
         details: details,
         scannedImagePath: scannedImagePath,
+        imageUrl: imageUrl,
         assetImagePath: assetImagePath,
         scannedAt: scannedAt,
         isFavorite: value,
+      );
+
+  Painting withImageUrl(String url) => Painting(
+        title: title,
+        artist: artist,
+        year: year,
+        movement: movement,
+        museum: museum,
+        confidence: confidence,
+        imageSeed: imageSeed,
+        hook: hook,
+        stories: stories,
+        shortStories: shortStories,
+        details: details,
+        scannedImagePath: scannedImagePath,
+        imageUrl: url,
+        assetImagePath: assetImagePath,
+        scannedAt: scannedAt,
+        isFavorite: isFavorite,
       );
 
   Map<String, dynamic> toJson() => {
@@ -147,6 +173,7 @@ class Painting {
         'shortStories': shortStories,
         'details': details.map((d) => d.toJson()).toList(),
         'scannedImagePath': scannedImagePath,
+        'imageUrl': imageUrl,
         'assetImagePath': assetImagePath,
         'scannedAt': scannedAt?.toIso8601String(),
         'isFavorite': isFavorite,
@@ -167,6 +194,7 @@ class Painting {
             .map((d) => PaintingDetail.fromJson(Map<String, dynamic>.from(d as Map)))
             .toList(),
         scannedImagePath: json['scannedImagePath'] as String?,
+        imageUrl: json['imageUrl'] as String?,
         assetImagePath: json['assetImagePath'] as String?,
         scannedAt: json['scannedAt'] == null ? null : DateTime.tryParse(json['scannedAt'] as String),
         isFavorite: json['isFavorite'] as bool? ?? false,

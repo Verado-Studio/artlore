@@ -171,6 +171,14 @@ class _CollectionPageState extends State<CollectionPage> {
     }
     filtered.sort(_comparator());
 
+    // Above the empty message when there's nothing yet; after the cards otherwise.
+    final discoverCard = _DiscoverCard(
+      onTap: () async {
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CameraPage()));
+        _load();
+      },
+    );
+
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -261,14 +269,9 @@ class _CollectionPageState extends State<CollectionPage> {
               ],
             ),
             const SizedBox(height: 12),
-            _DiscoverCard(
-              onTap: () async {
-                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CameraPage()));
-                _load();
-              },
-            ),
-            const SizedBox(height: 20),
-            if (filtered.isEmpty)
+            if (filtered.isEmpty) ...[
+              discoverCard,
+              const SizedBox(height: 20),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32),
                 child: Center(
@@ -278,8 +281,8 @@ class _CollectionPageState extends State<CollectionPage> {
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
                   ),
                 ),
-              )
-            else
+              ),
+            ] else ...[
               Column(
                 children: [
                   for (final painting in filtered) ...[
@@ -302,6 +305,8 @@ class _CollectionPageState extends State<CollectionPage> {
                   ],
                 ],
               ),
+              discoverCard,
+            ],
             if (filtered.isEmpty) ...[
               const SizedBox(height: 28),
               Text('Explore Masterpieces', style: Theme.of(context).textTheme.titleLarge),

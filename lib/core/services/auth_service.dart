@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../models/painting.dart';
 import 'purchases.dart';
+import 'scan_photo_cloud.dart';
 import 'user_data_repository.dart';
 
 /// Thin wrapper around Firebase Authentication. Email/password, Google (web
@@ -115,21 +116,36 @@ class AuthService {
     await _finishSignIn(guestScans);
   }
 
+  /// Web: asks Google to show the account chooser rather than silently
+  /// reusing whichever account the browser is already signed in to.
+  static GoogleAuthProvider get _googleWebProvider =>
+      GoogleAuthProvider()..setCustomParameters({'prompt': 'select_account'});
+
+  /// Native: google_sign_in remembers the last account picked and hands it
+  /// back without showing the chooser, so clear it first.
+  static Future<void> _forgetGoogleAccount() async {
+    if (kIsWeb) return;
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+  }
+
   static Future<void> signInWithGoogle() async {
     final guestScans = await _guestScans();
     if (kIsWeb) {
       final current = _auth.currentUser;
       if (current != null && current.isAnonymous) {
         try {
-          await current.linkWithPopup(GoogleAuthProvider());
+          await current.linkWithPopup(_googleWebProvider);
         } on FirebaseAuthException catch (e) {
           if (e.code != 'credential-already-in-use' && e.code != 'email-already-in-use') rethrow;
-          await _auth.signInWithPopup(GoogleAuthProvider());
+          await _auth.signInWithPopup(_googleWebProvider);
         }
       } else {
-        await _auth.signInWithPopup(GoogleAuthProvider());
+        await _auth.signInWithPopup(_googleWebProvider);
       }
     } else {
+      await _forgetGoogleAccount();
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         throw FirebaseAuthException(code: 'popup-closed-by-user', message: 'Sign-in was cancelled.');
@@ -171,6 +187,7 @@ class AuthService {
 
   static Future<void> signOut() async {
     await _auth.signOut();
+    await _forgetGoogleAccount();
     await RevenueCatService.syncIdentity();
   }
 
@@ -182,8 +199,10 @@ class AuthService {
   static Future<void> deleteAccount() async {
     final user = _auth.currentUser;
     if (user == null || user.isAnonymous) return;
+    await ScanPhotoCloud.deleteAllForCurrentUser();
     await UserDataRepository.deleteAllData();
     await user.delete();
+    await _forgetGoogleAccount();
     await RevenueCatService.syncIdentity();
   }
 

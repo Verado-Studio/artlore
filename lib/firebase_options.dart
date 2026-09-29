@@ -65,11 +65,11 @@ class DefaultFirebaseOptions {
   );
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyD4vp9K6MmoHM0_SxaBEKp6WBPQtE2Vcfw',
-    appId: '1:326099273958:ios:d7439be8332ffe28f25327',
+    appId: '1:326099273958:ios:949c3ac28b93e7b3f25327',
     messagingSenderId: '326099273958',
     projectId: 'paintings-identifier',
     storageBucket: 'paintings-identifier.firebasestorage.app',
-    iosClientId: '326099273958-ra7k7i7el3gm5uf5pj493snm43cm3n2r.apps.googleusercontent.com',
-    iosBundleId: 'com.veradostudio.artdetector',
+    iosClientId: '326099273958-4cfdchbv610prvf0u0ue2ekt19co5046.apps.googleusercontent.com',
+    iosBundleId: 'com.veradostudio.artlore',
   );
 }

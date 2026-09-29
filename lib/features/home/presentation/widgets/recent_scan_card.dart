@@ -25,6 +25,7 @@ class RecentScanCard extends StatelessWidget {
               child: ScannedImage(
                 seed: painting.imageSeed,
                 imagePath: painting.scannedImagePath,
+                imageUrl: painting.imageUrl,
                 assetPath: painting.assetImagePath,
                 borderRadius: 16,
               ),

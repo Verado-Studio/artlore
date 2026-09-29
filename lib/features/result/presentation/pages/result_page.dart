@@ -174,6 +174,7 @@ class _ResultPageState extends State<ResultPage> {
                       ScannedImage(
                         seed: _painting.imageSeed,
                         imagePath: _painting.scannedImagePath,
+                        imageUrl: _painting.imageUrl,
                         assetPath: _painting.assetImagePath,
                         icon: Icons.image_outlined,
                         showFrame: false,

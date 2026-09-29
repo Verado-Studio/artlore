@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/constants/sample_images.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -17,7 +19,7 @@ class CameraPage extends StatefulWidget {
   State<CameraPage> createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateMixin {
+class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _bounceController =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
   late final Animation<double> _bounceAnimation = Tween<double>(begin: 0, end: -8)
@@ -40,11 +42,13 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _setUpCamera();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _focusRingTimer?.cancel();
     _bounceController.dispose();
     _controller?.dispose();
@@ -64,7 +68,7 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
       );
       await _openCamera(backCamera);
     } catch (_) {
-      if (mounted) setState(() => _error = "Couldn't access the camera — use Gallery instead.");
+      if (mounted) setState(() => _error = 'Camera access is needed — tap the shutter to allow it, or use Gallery.');
     }
   }
 
@@ -80,7 +84,7 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
     try {
       await initializeFuture;
     } catch (_) {
-      if (mounted) setState(() => _error = "Couldn't access the camera — use Gallery instead.");
+      if (mounted) setState(() => _error = 'Camera access is needed — tap the shutter to allow it, or use Gallery.');
       await previous?.dispose();
       return;
     }
@@ -155,7 +159,57 @@ class _CameraPageState extends State<CameraPage> with SingleTickerProviderStateM
     });
   }
 
+  /// The camera failed to start — almost always because access was denied.
+  /// Asks again; once the OS won't show its popup any more (iOS after the
+  /// first "Don't Allow", Android after two), offers to open Settings instead.
+  Future<void> _requestCameraAgain() async {
+    if (kIsWeb) {
+      await _setUpCamera();
+      return;
+    }
+    final status = await Permission.camera.request();
+    if (!mounted) return;
+    if (status.isGranted || status.isLimited) {
+      await _setUpCamera();
+      return;
+    }
+    if (!status.isPermanentlyDenied) return;
+    final openSettings = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Camera access is off'),
+        content: const Text('To scan paintings, allow camera access for Artlore in Settings.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.inkSoft),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.clay),
+            child: const Text('Open Settings', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (openSettings == true) await openAppSettings();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Coming back from Settings with access now allowed — start the camera.
+    if (state == AppLifecycleState.resumed && _error != null) _setUpCamera();
+  }
+
   Future<void> _capture() async {
+    if (_error != null) {
+      await _requestCameraAgain();
+      return;
+    }
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized || _capturing) return;
     setState(() => _capturing = true);

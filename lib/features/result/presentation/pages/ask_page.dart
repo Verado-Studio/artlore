@@ -249,6 +249,7 @@ class _AskPageState extends State<AskPage> {
                                         child: ScannedImage(
                                           seed: painting.imageSeed,
                                           imagePath: painting.scannedImagePath,
+                                          imageUrl: painting.imageUrl,
                                           assetPath: painting.assetImagePath,
                                           showFrame: false,
                                           borderRadius: 0,

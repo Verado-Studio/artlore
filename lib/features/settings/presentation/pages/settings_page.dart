@@ -29,7 +29,10 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    _authSubscription = AuthService.authStateChanges.listen((user) {
+    // userChanges (not authStateChanges): signing up or linking Google/Apple
+    // upgrades the guest account in place, which authStateChanges doesn't
+    // report — so the "Signed in" row stayed stale until a relaunch.
+    _authSubscription = AuthService.userChanges.listen((user) {
       setState(() => _user = user);
       _loadDepth();
     });
@@ -208,13 +211,19 @@ class _SettingsPageState extends State<SettingsPage> {
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HelpSupportPage())),
                   ),
                   const SettingsTile(icon: Icons.language_outlined, label: 'Language', value: 'English'),
-                  SettingsTile(
-                    icon: Icons.login,
-                    label: signedIn ? 'Signed in' : 'Sign in',
-                    value: signedInLabel,
-                    onTap: _handleSignInTap,
-                    showDivider: signedIn,
-                  ),
+                  if (signedIn)
+                    SettingsTile(
+                      icon: Icons.account_circle_outlined,
+                      label: 'Signed in',
+                      subtitle: signedInLabel,
+                      trailing: TextButton(
+                        onPressed: _handleSignInTap,
+                        style: TextButton.styleFrom(foregroundColor: AppColors.clay),
+                        child: const Text('Sign out', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      ),
+                    )
+                  else
+                    SettingsTile(icon: Icons.login, label: 'Sign in', onTap: _handleSignInTap, showDivider: false),
                   if (signedIn)
                     SettingsTile(
                       icon: Icons.delete_outline,

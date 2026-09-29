@@ -8,6 +8,8 @@ class SettingsTile extends StatelessWidget {
     required this.icon,
     required this.label,
     this.value,
+    this.subtitle,
+    this.trailing,
     this.onTap,
     this.showDivider = true,
     this.color,
@@ -16,6 +18,12 @@ class SettingsTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String? value;
+
+  /// A second line under [label], e.g. the signed-in account's name.
+  final String? subtitle;
+
+  /// Replaces the default value text / chevron on the right.
+  final Widget? trailing;
   final VoidCallback? onTap;
   final bool showDivider;
 
@@ -37,7 +45,13 @@ class SettingsTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 17, color: color),
           ),
-          trailing: value != null
+          subtitle: subtitle == null
+              ? null
+              : Text(
+                  subtitle!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft, fontSize: 15),
+                ),
+          trailing: trailing ?? (value != null
               ? ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 160),
                   child: Text(
@@ -48,7 +62,7 @@ class SettingsTile extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft, fontSize: 15),
                   ),
                 )
-              : const Icon(Icons.chevron_right, color: AppColors.inkSoft, size: 22),
+              : const Icon(Icons.chevron_right, color: AppColors.inkSoft, size: 22)),
         ),
         if (showDivider) const Divider(height: 1, indent: 56),
       ],

@@ -67,10 +67,11 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
       return;
     }
     try {
-      final painting = await PaintingIdentifierService.identify(image);
+      final identified = await PaintingIdentifierService.identify(image);
       final persistedPath = await ScannedImageStore.persist(image.path);
-      final withImage = painting.withScannedImagePath(persistedPath);
+      final withImage = identified.painting.withScannedImagePath(persistedPath);
       await UserDataRepository.recordScan(withImage);
+      unawaited(UserDataRepository.uploadScanPhoto(withImage, identified.jpeg));
       _progressTimer?.cancel();
       if (!mounted) return;
       Navigator.of(context).pushReplacement(

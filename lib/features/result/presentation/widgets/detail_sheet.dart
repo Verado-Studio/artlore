@@ -35,6 +35,7 @@ Future<void> showDetailSheet(BuildContext context, Painting painting, PaintingDe
                     child: ScannedImage(
                       seed: painting.imageSeed,
                       imagePath: painting.scannedImagePath,
+                      imageUrl: painting.imageUrl,
                       assetPath: painting.assetImagePath,
                       showFrame: false,
                     ),
@@ -82,6 +83,7 @@ Future<void> showDetailSheet(BuildContext context, Painting painting, PaintingDe
                             child: ScannedImage(
                               seed: painting.imageSeed + 2,
                               imagePath: painting.scannedImagePath,
+                              imageUrl: painting.imageUrl,
                               assetPath: painting.assetImagePath,
                               showFrame: false,
                             ),
@@ -106,6 +108,7 @@ Future<void> showDetailSheet(BuildContext context, Painting painting, PaintingDe
                     : ScannedImage(
                         seed: painting.imageSeed + 2,
                         imagePath: painting.scannedImagePath,
+                        imageUrl: painting.imageUrl,
                         assetPath: painting.assetImagePath,
                         showFrame: false,
                       ),

@@ -76,6 +76,7 @@ class _HomePageState extends State<HomePage> {
     final saved = results[1] as List<Painting>;
     final isPro = results[2] as bool;
     final user = AuthService.currentUser;
+    unawaited(UserDataRepository.backfillScanPhotos());
     if (!mounted) return;
     setState(() {
       _scansUsed = used;

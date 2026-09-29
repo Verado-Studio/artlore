@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// Scan photos live under the owning account. Only that account can upload,
+// list or delete them. Download URLs carry their own access token, so a
+// photo merged in from a guest session keeps loading after sign-in.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{userId}/scans/{allPaths=**} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

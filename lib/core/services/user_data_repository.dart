@@ -1,9 +1,13 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
+import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb, visibleForTesting;
 
 import '../models/painting.dart';
 import 'app_preferences.dart';
 import 'auth_service.dart';
+import 'scan_photo_cloud.dart';
 import 'scanned_image_store.dart';
 
 /// Account-tied data: saved paintings, scans used, default depth.
@@ -142,6 +146,7 @@ class UserDataRepository {
     final replaced = history.where((p) => p.title == painting.title);
     for (final p in replaced) {
       if (p.scannedImagePath != painting.scannedImagePath) await ScannedImageStore.delete(p.scannedImagePath);
+      if (p.imageUrl != painting.imageUrl) await ScanPhotoCloud.delete(p.imageUrl);
     }
     history.removeWhere((p) => p.title == painting.title);
     history.add(painting);
@@ -152,10 +157,57 @@ class UserDataRepository {
       final overflowCount = history.length - AppPreferences.freeScanHistoryLimit;
       for (final p in history.take(overflowCount)) {
         await ScannedImageStore.delete(p.scannedImagePath);
+        await ScanPhotoCloud.delete(p.imageUrl);
       }
       history.removeRange(0, overflowCount);
     }
     await setSavedPaintings(history);
+  }
+
+  /// Uploads a just-recorded scan's photo to the cloud and saves its URL on
+  /// that entry. Runs in the background after the scan is saved, so a slow
+  /// upload never holds up the result; if it fails, [backfillScanPhotos]
+  /// retries later from the local copy.
+  static Future<void> uploadScanPhoto(Painting painting, Uint8List jpeg) async {
+    try {
+      final url = await ScanPhotoCloud.upload(jpeg);
+      if (url != null) await _attachImageUrl(painting, url);
+    } catch (_) {}
+  }
+
+  static Future<void> _attachImageUrl(Painting painting, String url) async {
+    final history = await savedPaintings();
+    final index = history.indexWhere(
+      (p) => p.title == painting.title && p.scannedImagePath == painting.scannedImagePath,
+    );
+    if (index == -1) {
+      // The scan was removed or replaced while uploading.
+      await ScanPhotoCloud.delete(url);
+      return;
+    }
+    history[index] = history[index].withImageUrl(url);
+    await setSavedPaintings(history);
+  }
+
+  static String? _backfilledUid;
+
+  /// Uploads any scan photo that exists on this device but has no cloud copy
+  /// yet — scans from before cloud storage, or an upload that failed. Runs at
+  /// most once per account per app session.
+  static Future<void> backfillScanPhotos() async {
+    final uid = AuthService.currentUser?.uid;
+    if (kIsWeb || uid == null || _backfilledUid == uid) return;
+    _backfilledUid = uid;
+    final history = await savedPaintings();
+    for (final p in history) {
+      final path = p.scannedImagePath;
+      if (p.imageUrl != null || path == null) continue;
+      try {
+        final file = File(ScannedImageStore.resolve(path));
+        if (!await file.exists()) continue;
+        await uploadScanPhoto(p, await file.readAsBytes());
+      } catch (_) {}
+    }
   }
 
   /// Adds scans made as a guest on this device to the account just signed
@@ -192,6 +244,7 @@ class UserDataRepository {
     history.removeWhere((p) => p.title == painting.title);
     await setSavedPaintings(history);
     await ScannedImageStore.delete(painting.scannedImagePath);
+    await ScanPhotoCloud.delete(painting.imageUrl);
   }
 
   /// Scans used today (resets at local midnight) — read-only here. The only

@@ -6,10 +6,10 @@ import 'package:path_provider/path_provider.dart';
 import '../models/painting.dart';
 
 /// Whether [painting] has an image this device can actually show: a bundled
-/// asset, or a scan photo saved on this device. Scans sync across devices
-/// but their photos don't, so a scan from another phone fails this check.
+/// asset, a cloud copy, or a photo saved on this device. Only an old scan from
+/// another phone that was never uploaded fails this check.
 bool hasViewableImage(Painting painting) {
-  if (painting.assetImagePath != null) return true;
+  if (painting.assetImagePath != null || painting.imageUrl != null) return true;
   final path = painting.scannedImagePath;
   if (path == null) return false;
   if (kIsWeb) return true;

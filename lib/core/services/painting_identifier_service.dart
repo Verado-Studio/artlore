@@ -44,8 +44,16 @@ class PaintingIdentifierService {
   /// base64 inflation (~4/3) plus the other fields on the document.
   static const int _maxBase64Length = 900000;
 
-  static Future<Painting> identify(XFile image) async {
+  /// Identifies [image], returning the result along with the shrunk JPEG
+  /// that was sent — reused for the cloud copy of the scan photo so the
+  /// upload stays small without compressing the photo twice.
+  static Future<({Painting painting, Uint8List jpeg})> identify(XFile image) async {
     final base64Image = await _compressToBase64(image);
+    final painting = await _identifyBase64(base64Image, image);
+    return (painting: painting, jpeg: base64Decode(base64Image));
+  }
+
+  static Future<Painting> _identifyBase64(String base64Image, XFile image) async {
 
     final docRef = FirebaseFirestore.instance.collection('identifyRequests').doc();
     await docRef.set({
