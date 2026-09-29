@@ -61,7 +61,7 @@ class SettingsTile extends StatelessWidget {
                   subtitle!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft, fontSize: 15),
                 ),
-          trailing: trailing ?? (value != null
+          trailing: labelAction != null ? null : trailing ?? (value != null
               ? ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 160),
                   child: Text(
