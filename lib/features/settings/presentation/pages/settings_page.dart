@@ -216,9 +216,15 @@ class _SettingsPageState extends State<SettingsPage> {
                       icon: Icons.account_circle_outlined,
                       label: 'Signed in',
                       subtitle: signedInLabel,
-                      trailing: TextButton(
+                      trailing: const SizedBox.shrink(),
+                      labelAction: TextButton(
                         onPressed: _handleSignInTap,
-                        style: TextButton.styleFrom(foregroundColor: AppColors.clay),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.clay,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         child: const Text('Sign out', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       ),
                     )

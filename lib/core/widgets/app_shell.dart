@@ -35,15 +35,19 @@ class _AppShellState extends State<AppShell> {
     // to pick up a photo shared into the app from another app's share sheet
     // — both a cold start (the app wasn't running yet) and a warm one (the
     // app was already open) end up here.
-    _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen(_handleSharedMedia);
+    // Where the share plugin isn't built in (web, or iOS before its Share
+    // Extension is set up) these calls throw; sharing just isn't available.
+    _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen(_handleSharedMedia, onError: (_) {});
     _checkInitialSharedMedia();
   }
 
   Future<void> _checkInitialSharedMedia() async {
-    final media = await ReceiveSharingIntent.instance.getInitialMedia();
-    if (media.isEmpty) return;
-    await ReceiveSharingIntent.instance.reset();
-    _handleSharedMedia(media);
+    try {
+      final media = await ReceiveSharingIntent.instance.getInitialMedia();
+      if (media.isEmpty) return;
+      await ReceiveSharingIntent.instance.reset();
+      _handleSharedMedia(media);
+    } catch (_) {}
   }
 
   void _handleSharedMedia(List<SharedMediaFile> media) {

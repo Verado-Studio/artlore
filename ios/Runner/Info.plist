@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is used to photograph paintings so we can identify them and tell you their story.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Lets you save your painting share cards to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Photo library access lets you pick an existing photo of a painting to identify instead of taking a new one.</string>
 	<key>UIApplicationSceneManifest</key>

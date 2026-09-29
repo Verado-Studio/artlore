@@ -22,9 +22,13 @@ Future<void> _shareCardImage(BuildContext context, GlobalKey boundaryKey, Painti
     if (byteData == null) return;
     final bytes = byteData.buffer.asUint8List();
     final file = XFile.fromData(bytes, mimeType: 'image/png', name: 'painting_share.png');
+    // iPad shows the share sheet as a popover, which needs an on-screen
+    // anchor — without one the share fails there. Anchor it to the card.
+    final origin = renderObject.localToGlobal(Offset.zero) & renderObject.size;
     await Share.shareXFiles(
       [file],
       text: '${painting.title} by ${painting.artist} — discovered with ${AppStrings.appName}.',
+      sharePositionOrigin: origin,
     );
   } catch (_) {
     messenger.showSnackBar(const SnackBar(content: Text("Couldn't create the share image — please try again.")));

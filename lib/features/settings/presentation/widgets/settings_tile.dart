@@ -10,6 +10,7 @@ class SettingsTile extends StatelessWidget {
     this.value,
     this.subtitle,
     this.trailing,
+    this.labelAction,
     this.onTap,
     this.showDivider = true,
     this.color,
@@ -24,6 +25,10 @@ class SettingsTile extends StatelessWidget {
 
   /// Replaces the default value text / chevron on the right.
   final Widget? trailing;
+
+  /// Sits at the right end of the [label] line itself — unlike [trailing],
+  /// which is centered between the label and [subtitle].
+  final Widget? labelAction;
   final VoidCallback? onTap;
   final bool showDivider;
 
@@ -39,11 +44,16 @@ class SettingsTile extends StatelessWidget {
           onTap: onTap,
           contentPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
           leading: Icon(icon, color: color ?? AppColors.ink, size: 24),
-          title: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 17, color: color),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 17, color: color),
+                ),
+              ),
+              ?labelAction,
+            ],
           ),
           subtitle: subtitle == null
               ? null
