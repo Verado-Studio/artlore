@@ -22,19 +22,23 @@ class RecentScanCard extends StatelessWidget {
             SizedBox(
               height: 128,
               width: 128,
-              child: ScannedImage(seed: painting.imageSeed, imagePath: painting.scannedImagePath, borderRadius: 16),
+              child: ScannedImage(
+                seed: painting.imageSeed,
+                imagePath: painting.scannedImagePath,
+                imageUrl: painting.imageUrl,
+                assetPath: painting.assetImagePath,
+                borderRadius: 16,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               painting.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Text(
               painting.artist,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
             ),
           ],

@@ -1,17 +1,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/purchases.dart';
 import '../../../../core/services/user_data_repository.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../settings/presentation/pages/privacy_policy_page.dart';
-import '../../../settings/presentation/pages/terms_page.dart';
+import '../../../settings/presentation/pages/sign_in_page.dart';
 
 /// Shows the Pro paywall as a dialog-style sheet: the triggering screen stays
 /// visible (dimmed) behind it, with a close control over that reveal and a
 /// rounded card below carrying the offer. [subtitle] ties the pitch to
 /// whatever the user just tapped, e.g. "Unlock the 4 hidden details in this painting."
+///
+/// A guest sees the full offer immediately — sign-in is only required once
+/// they actually tap to subscribe (see [_PaywallSheetState._continue]),
+/// since Pro status is tied to a real account so it can follow them across
+/// devices.
 Future<void> showPaywallSheet(BuildContext context, {String subtitle = 'Unlock the full art experience.'}) {
   return showModalBottomSheet(
     context: context,
@@ -33,37 +40,146 @@ class _PaywallSheet extends StatefulWidget {
 class _PaywallSheetState extends State<_PaywallSheet> {
   String _plan = 'yearly';
   bool _submitting = false;
-  bool _closeReady = false;
-  Timer? _closeTimer;
+  Timer? _messageTimer;
+  Package? _annualPackage;
+  Package? _monthlyPackage;
 
-  @override
-  void initState() {
-    super.initState();
-    _closeTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _closeReady = true);
+  // A regular SnackBar targets the ScaffoldMessenger of the page that opened
+  // this sheet, whose overlay sits *below* this modal route — so it renders
+  // invisibly behind the sheet instead of on top of it. Showing feedback as
+  // part of the sheet's own content avoids that entirely.
+  String? _message;
+
+  void _showMessage(String text) {
+    _messageTimer?.cancel();
+    setState(() => _message = text);
+    _messageTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _message = null);
     });
   }
 
   @override
+  void initState() {
+    super.initState();
+    _fetchOfferings();
+  }
+
+  Future<void> _fetchOfferings() async {
+    try {
+      final offerings = await Purchases.getOfferings();
+      final current = offerings.current;
+      if (current == null || !mounted) return;
+      setState(() {
+        _annualPackage = current.annual ?? current.getPackage('\$rc_annual');
+        _monthlyPackage = current.monthly ?? current.getPackage('\$rc_monthly');
+      });
+    } catch (_) {
+      // Offerings unavailable (RevenueCat not configured on this platform
+      // yet, or a network hiccup) — plan cards just keep their placeholder
+      // prices, and checkout below refuses to proceed without a real
+      // package rather than silently granting Pro for free.
+    }
+  }
+
+  @override
   void dispose() {
-    _closeTimer?.cancel();
+    _messageTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _continue() async {
-    setState(() => _submitting = true);
-    // No real store/RevenueCat integration yet — this just flips the local
-    // "Pro" flag so the rest of the app's gating (scans, locked details,
-    // Art-lover depth) behaves as if a purchase went through. Prices below
-    // are placeholders too: per the brief, these should come from
-    // RevenueCat's offerings once that's wired up, never hard-coded.
-    await UserDataRepository.setPro(true);
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    Navigator.of(context).pop();
-    messenger.showSnackBar(
-      const SnackBar(content: Text("You're on Pro now — enjoy the full experience.")),
+  /// Shows a "sign in to continue" dialog and, if the user taps through and
+  /// signs in successfully, returns true. Cancelling either the dialog or the
+  /// sign-in flow returns false so [_continue] can bail out.
+  Future<bool> _promptSignIn() async {
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 10),
+        contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        title: Text(
+          'Sign in to continue',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          "You'll need an account so your Pro subscription follows you across devices.",
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft, fontSize: 14.5),
+        ),
+        actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ElevatedButton(
+                onPressed: () async {
+                  final signedIn = await Navigator.of(dialogContext).push<bool>(
+                    MaterialPageRoute(builder: (_) => const SignInPage()),
+                  );
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop(signedIn == true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.amber,
+                  foregroundColor: AppColors.ink,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 0,
+                ),
+                child: const Text('Sign in', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                style: TextButton.styleFrom(foregroundColor: AppColors.inkSoft),
+                child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
+    return proceed == true;
+  }
+
+  Future<void> _continue() async {
+    if (!AuthService.isSignedIn) {
+      final signedIn = await _promptSignIn();
+      if (!signedIn || !mounted) return;
+    }
+
+    final isYearly = _plan == 'yearly';
+    final package = isYearly ? _annualPackage : _monthlyPackage;
+    if (package == null) {
+      _showMessage("Pricing isn't available right now — please try again shortly.");
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final result = await Purchases.purchase(PurchaseParams.package(package));
+      final isPro = result.customerInfo.entitlements.active.containsKey('pro');
+      await UserDataRepository.setPro(isPro);
+      if (!mounted) return;
+      if (isPro) {
+        final messenger = ScaffoldMessenger.of(context);
+        Navigator.of(context).pop();
+        messenger.showSnackBar(
+          const SnackBar(content: Text("You're on Pro now — enjoy the full experience.")),
+        );
+      } else {
+        _showMessage("Purchase went through, but Pro isn't active — try Restore Purchases.");
+      }
+    } on PlatformException catch (e) {
+      final errorCode = PurchasesErrorHelper.getErrorCode(e);
+      if (errorCode != PurchasesErrorCode.purchaseCancelledError && mounted) {
+        _showMessage('Purchase error: ${e.message ?? e.code}');
+      }
+    } catch (e) {
+      if (mounted) _showMessage('Purchase error: $e');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   static const _benefits = [
@@ -84,18 +200,11 @@ class _PaywallSheetState extends State<_PaywallSheet> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 12, 16, 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  AnimatedOpacity(
-                    opacity: _closeReady ? 1 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: _RoundIcon(
-                      icon: Icons.close,
-                      onTap: _closeReady ? () => Navigator.of(context).pop() : () {},
-                    ),
-                  ),
+                  _RoundIcon(icon: Icons.close, onTap: () => Navigator.of(context).pop()),
                 ],
               ),
             ),
@@ -103,7 +212,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
           Positioned(
             left: 16,
             right: 16,
-            bottom: 24,
+            bottom: 24 + MediaQuery.paddingOf(context).bottom,
             top: 110,
             child: Container(
               decoration: BoxDecoration(
@@ -111,66 +220,135 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                 borderRadius: BorderRadius.circular(28),
               ),
               clipBehavior: Clip.antiAlias,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Go Pro',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 6),
+              // The card's own height is set by fixed top/bottom offsets from the
+              // screen edges, so it's often taller than the content needs — on a
+              // tall phone that left everything bunched at the top with dead space
+              // below. Centering the content (via the min-height constraint) fills
+              // that space evenly instead, while still scrolling if it doesn't fit.
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight - 44),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Go Pro',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontSize: 23, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => restorePurchases(context),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.clay,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  ),
+                                  child: const Text(
+                                    'Restore Purchase',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                    const SizedBox(height: 4),
                     Text(
                       widget.subtitle,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft, fontSize: 15),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/paywall.webp',
+                        width: double.infinity,
+                        height: 160,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    if (_message case final message?) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          message,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
                     for (final benefit in _benefits) ...[
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(bottom: 10),
                         child: Row(
                           children: [
-                            Icon(benefit.icon, color: AppColors.ink, size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(benefit.label, style: Theme.of(context).textTheme.bodyLarge)),
+                            Icon(benefit.icon, color: AppColors.ink, size: 19),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                benefit.label,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 15),
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ],
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _PlanCard(
-                            title: 'Yearly',
-                            price: '\$59.99 / yr',
-                            caption: 'Save 85% · 3-day free trial',
-                            selected: isYearly,
-                            onTap: () => setState(() => _plan = 'yearly'),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _PlanCard(
+                              title: 'Yearly',
+                              price: _annualPackage?.storeProduct.priceString != null
+                                  ? '${_annualPackage!.storeProduct.priceString} / yr'
+                                  : '\$59.99 / yr',
+                              caption: 'Save 85% · 3-day free trial',
+                              selected: isYearly,
+                              onTap: () => setState(() => _plan = 'yearly'),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _PlanCard(
-                            title: 'Monthly',
-                            price: '\$9.99 / mo',
-                            caption: 'Billed monthly',
-                            selected: !isYearly,
-                            onTap: () => setState(() => _plan = 'monthly'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _PlanCard(
+                              title: 'Monthly',
+                              price: _monthlyPackage?.storeProduct.priceString != null
+                                  ? '${_monthlyPackage!.storeProduct.priceString} / mo'
+                                  : '\$9.99 / mo',
+                              caption: 'Billed monthly',
+                              selected: !isYearly,
+                              onTap: () => setState(() => _plan = 'monthly'),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 14),
                     if (isYearly)
                       Text(
-                        '3 days free, then \$59.99/year. Cancel anytime.',
+                        '3 days free, then ${_annualPackage?.storeProduct.priceString ?? '\$59.99'}/year. Cancel anytime.',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: AppColors.inkSoft, fontStyle: FontStyle.italic),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.inkSoft,
+                              fontStyle: FontStyle.italic,
+                              fontSize: 13,
+                            ),
                       ),
                     SizedBox(
                       width: double.infinity,
@@ -185,38 +363,18 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                                   height: 20,
                                   child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ink),
                                 )
-                              : Text(isYearly ? 'Start Free Trial' : 'Continue'),
+                              : Text(
+                                  isYearly ? 'Start Free Trial' : 'Continue',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                                ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => restorePurchases(context),
-                        child: const Text('Restore Purchases'),
+                          ],
+                        ),
                       ),
-                    ),
-                    Center(
-                      child: Wrap(
-                        alignment: WrapAlignment.center,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const TermsPage()),
-                            ),
-                            child: const Text('Terms'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
-                            ),
-                            child: const Text('Privacy'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                    );
+                },
               ),
             ),
           ),
@@ -277,13 +435,16 @@ class _PlanCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16)),
             const SizedBox(height: 6),
-            Text(price, style: Theme.of(context).textTheme.titleLarge),
+            Text(price, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 19)),
             const SizedBox(height: 2),
             Text(
               caption,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: selected ? AppColors.clay : AppColors.inkSoft),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(fontSize: 12.5, color: selected ? AppColors.clay : AppColors.inkSoft),
             ),
           ],
         ),

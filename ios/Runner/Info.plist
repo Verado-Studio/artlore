@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Artdetector</string>
+	<string>Artlore</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>artdetector</string>
+	<string>artlore</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is used to photograph paintings so we can identify them and tell you their story.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Lets you save your painting share cards to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Photo library access lets you pick an existing photo of a painting to identify instead of taking a new one.</string>
 	<key>UIApplicationSceneManifest</key>
@@ -60,7 +62,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.326099273958-ra7k7i7el3gm5uf5pj493snm43cm3n2r</string>
+				<string>com.googleusercontent.apps.326099273958-4cfdchbv610prvf0u0ue2ekt19co5046</string>
 			</array>
 		</dict>
 	</array>

@@ -19,7 +19,10 @@ class _SignUpPageState extends State<SignUpPage> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _obscurePassword = true;
+  bool _obscureConfirm = true;
   bool _submitting = false;
+
+  static const _minPasswordLength = 8;
 
   @override
   void dispose() {
@@ -156,14 +159,33 @@ class _SignUpPageState extends State<SignUpPage> {
                               ),
                             ),
                           ),
-                          validator: (v) => (v == null || v.length < 6) ? 'At least 6 characters' : null,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Enter a password';
+                            if (v.length < _minPasswordLength) {
+                              return 'Password must be at least $_minPasswordLength characters';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: _confirmController,
-                          obscureText: _obscurePassword,
-                          decoration: const InputDecoration(labelText: 'Confirm password'),
-                          validator: (v) => (v != _passwordController.text) ? 'Passwords do not match' : null,
+                          obscureText: _obscureConfirm,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm password',
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                              icon: Icon(
+                                _obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                color: AppColors.inkSoft,
+                              ),
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Confirm your password';
+                            if (v != _passwordController.text) return 'Passwords do not match';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton(

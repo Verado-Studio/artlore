@@ -1,5 +1,10 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/services/app_preferences.dart';
 import '../../../core/services/user_data_repository.dart';
@@ -22,4 +27,25 @@ Future<void> startScanFlow(BuildContext context, {XFile? image}) async {
   }
   if (!context.mounted) return;
   Navigator.of(context).push(MaterialPageRoute(builder: (_) => AnalysingPage(image: image)));
+}
+
+/// Loads a bundled demo painting asset and runs it through the normal scan
+/// flow — see [startScanFlow]. On Android/iOS the asset is copied into a
+/// real temp file (an [XFile] backed purely by in-memory bytes has no real
+/// filesystem path, which later steps need); on web it's passed straight
+/// through as in-memory bytes since there's no filesystem there at all.
+Future<void> startSampleScanFlow(BuildContext context, String assetPath) async {
+  final data = await rootBundle.load(assetPath);
+  final bytes = data.buffer.asUint8List();
+  final name = assetPath.split('/').last;
+  if (!context.mounted) return;
+  if (kIsWeb) {
+    await startScanFlow(context, image: XFile.fromData(bytes, name: name));
+    return;
+  }
+  final dir = await getTemporaryDirectory();
+  final file = File('${dir.path}/$name');
+  await file.writeAsBytes(bytes, flush: true);
+  if (!context.mounted) return;
+  await startScanFlow(context, image: XFile(file.path));
 }

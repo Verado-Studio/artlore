@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/models/painting.dart';
 import '../../../../core/services/app_preferences.dart';
 import '../../../../core/services/ask_context.dart';
-import '../../../../core/services/tts_cache_service.dart';
+import '../../../../core/services/tts_service.dart';
 import '../../../../core/services/user_data_repository.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_shell.dart';
@@ -25,11 +25,12 @@ class ResultPage extends StatefulWidget {
   State<ResultPage> createState() => _ResultPageState();
 }
 
-enum _ListenState { idle, playing, paused }
+enum _ListenState { idle, loading, playing, paused }
 
 class _ResultPageState extends State<ResultPage> {
-  String _depth = 'Simple';
+  String _depth = UserDataRepository.cachedDepth ?? 'Simple';
   bool _saved = false;
+  bool _isFavorite = false;
   _ListenState _listenState = _ListenState.idle;
   bool _isPro = false;
 
@@ -38,30 +39,36 @@ class _ResultPageState extends State<ResultPage> {
   @override
   void initState() {
     super.initState();
+    _isFavorite = _painting.isFavorite;
     _loadPreferences();
     AskContext.current.value = _painting;
   }
 
   @override
   void dispose() {
-    TtsCacheService.stop();
+    TtsService.stop();
     super.dispose();
   }
 
   Future<void> _toggleListen() async {
+    if (_listenState == _ListenState.loading) {
+      await TtsService.stop();
+      if (mounted) setState(() => _listenState = _ListenState.idle);
+      return;
+    }
     if (_listenState == _ListenState.playing) {
-      if (TtsCacheService.supportsPause) {
-        await TtsCacheService.pause();
+      if (TtsService.supportsPause) {
+        await TtsService.pause();
         if (mounted) setState(() => _listenState = _ListenState.paused);
       } else {
-        await TtsCacheService.stop();
+        await TtsService.stop();
         if (mounted) setState(() => _listenState = _ListenState.idle);
       }
       return;
     }
     if (_listenState == _ListenState.paused) {
-      await TtsCacheService.resume();
-      if (mounted) setState(() => _listenState = _ListenState.playing);
+      setState(() => _listenState = _ListenState.playing);
+      await TtsService.resume();
       return;
     }
     if (!_isPro) {
@@ -70,10 +77,14 @@ class _ResultPageState extends State<ResultPage> {
     }
     final text = _painting.storyFor(_depth, isPro: _isPro);
     if (text.isEmpty) return;
-    setState(() => _listenState = _ListenState.playing);
-    await TtsCacheService.speak(
-      cacheKey: '${_painting.title}::$_depth',
+    setState(() => _listenState = _ListenState.loading);
+    await TtsService.speak(
       text: text,
+      onStart: () {
+        if (mounted && _listenState == _ListenState.loading) {
+          setState(() => _listenState = _ListenState.playing);
+        }
+      },
       onDone: () {
         if (mounted) setState(() => _listenState = _ListenState.idle);
       },
@@ -81,9 +92,14 @@ class _ResultPageState extends State<ResultPage> {
   }
 
   Future<void> _loadPreferences() async {
-    final depth = await UserDataRepository.defaultDepth();
-    final saved = await UserDataRepository.savedPaintings();
-    final isPro = await UserDataRepository.isPro();
+    final results = await Future.wait([
+      UserDataRepository.defaultDepth(),
+      UserDataRepository.savedPaintings(),
+      UserDataRepository.isPro(),
+    ]);
+    final depth = results[0] as String;
+    final saved = results[1] as List<Painting>;
+    final isPro = results[2] as bool;
     if (!mounted) return;
     setState(() {
       _depth = depth;
@@ -114,6 +130,12 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
+  Future<void> _toggleFavorite() async {
+    await UserDataRepository.toggleFavorite(_painting);
+    if (!mounted) return;
+    setState(() => _isFavorite = !_isFavorite);
+  }
+
   Future<void> _openPaywall(String subtitle) async {
     await showPaywallSheet(context, subtitle: subtitle);
     final isPro = await UserDataRepository.isPro();
@@ -133,50 +155,115 @@ class _ResultPageState extends State<ResultPage> {
     final lockedCount = _isPro ? 0 : _painting.details.where((d) => d.locked).length;
 
     return Scaffold(
-      body: ListView(
+      body: SafeArea(
+        top: false,
+        child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          Stack(
-            children: [
+          Padding(
+            padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
+            child: Stack(
+              children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+                borderRadius: BorderRadius.zero,
                 child: AspectRatio(
                   aspectRatio: 1.05,
-                  child: ScannedImage(
-                    seed: _painting.imageSeed,
-                    imagePath: _painting.scannedImagePath,
-                    icon: Icons.image_outlined,
-                    showFrame: false,
-                    borderRadius: 0,
-                  ),
-                ),
-              ),
-              SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      _RoundIcon(icon: Icons.arrow_back, onTap: _goHome),
-                      Row(
-                        children: [
-                          _RoundIcon(icon: Icons.ios_share, onTap: () => showShareCardSheet(context, _painting)),
-                          const SizedBox(width: 10),
-                          _RoundIcon(
-                            icon: _saved ? Icons.bookmark : Icons.bookmark_border,
-                            onTap: _toggleSaved,
+                      ScannedImage(
+                        seed: _painting.imageSeed,
+                        imagePath: _painting.scannedImagePath,
+                        imageUrl: _painting.imageUrl,
+                        assetPath: _painting.assetImagePath,
+                        icon: Icons.image_outlined,
+                        showFrame: false,
+                        borderRadius: 0,
+                      ),
+                      IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: const [0, 0.8, 0.94, 1],
+                              colors: [
+                                Colors.transparent,
+                                Colors.transparent,
+                                AppColors.background.withValues(alpha: 0.7),
+                                AppColors.background,
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
+              Positioned(
+                left: 10,
+                top: 10,
+                child: _RoundIcon(icon: Icons.arrow_back, onTap: _goHome),
+              ),
+              Positioned(
+                right: 14,
+                top: 0,
+                bottom: 0,
+                child: Align(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(23),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _RoundIcon(
+                          icon: _isFavorite ? Icons.favorite : Icons.favorite_border,
+                          iconColor: _isFavorite ? AppColors.clay : Colors.white,
+                          onTap: _toggleFavorite,
+                        ),
+                        const SizedBox(height: 6),
+                        _RoundIcon(
+                          icon: _saved ? Icons.bookmark : Icons.bookmark_border,
+                          onTap: _toggleSaved,
+                        ),
+                        const SizedBox(height: 6),
+                        _RoundIcon(icon: Icons.ios_share, onTap: () => showShareCardSheet(context, _painting)),
+                        const SizedBox(height: 6),
+                        _RoundIcon(
+                          icon: switch (_listenState) {
+                            _ListenState.playing =>
+                              TtsService.supportsPause ? Icons.pause : Icons.stop,
+                            _ListenState.paused => Icons.play_arrow,
+                            _ListenState.loading || _ListenState.idle => Icons.volume_up_outlined,
+                          },
+                          loading: _listenState == _ListenState.loading,
+                          onTap: _toggleListen,
+                        ),
+                        const SizedBox(height: 6),
+                        _RoundIcon(
+                          icon: Icons.chat_bubble_outline,
+                          onTap: () {
+                            if (!_isPro) {
+                              _openPaywall('Unlock Ask to chat about this painting.');
+                              return;
+                            }
+                            Navigator.of(context).push(MaterialPageRoute(builder: (_) => AskPage(painting: _painting)));
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              ],
+            ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+            padding: const EdgeInsets.fromLTRB(20, 2, 20, 40),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -205,12 +292,24 @@ class _ResultPageState extends State<ResultPage> {
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    '${_painting.artist} • ${_painting.year}',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
+                  _ArtistAndConfidenceRow(artist: _painting.artist, confidence: _painting.confidence),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Expanded(child: _ArrowLine(pointLeft: true)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          'Year: ${_painting.year}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                        ),
+                      ),
+                      const Expanded(child: _ArrowLine(pointLeft: false)),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  ConfidenceBadge(confidence: _painting.confidence),
                 ],
                 const SizedBox(height: 22),
                 DepthToggle(
@@ -223,7 +322,7 @@ class _ResultPageState extends State<ResultPage> {
                       return;
                     }
                     if (_listenState != _ListenState.idle) {
-                      TtsCacheService.stop();
+                      TtsService.stop();
                       _listenState = _ListenState.idle;
                     }
                     setState(() => _depth = value);
@@ -246,77 +345,52 @@ class _ResultPageState extends State<ResultPage> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 26),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _PillActionButton(
-                        icon: switch (_listenState) {
-                          _ListenState.playing =>
-                            TtsCacheService.supportsPause ? Icons.pause_circle_outlined : Icons.stop_circle_outlined,
-                          _ListenState.paused => Icons.play_circle_outline,
-                          _ListenState.idle => Icons.volume_up_outlined,
-                        },
-                        label: switch (_listenState) {
-                          _ListenState.playing => TtsCacheService.supportsPause ? 'Pause' : 'Stop',
-                          _ListenState.paused => 'Resume',
-                          _ListenState.idle => 'Listen',
-                        },
-                        onTap: _toggleListen,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _PillActionButton(
-                        icon: Icons.chat_bubble_outline,
-                        label: 'Ask',
-                        onTap: () {
-                          if (!_isPro) {
-                            _openPaywall('Unlock Ask to chat about this painting.');
-                            return;
-                          }
-                          Navigator.of(context).push(MaterialPageRoute(builder: (_) => AskPage(painting: _painting)));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => HiddenDetailsPage(painting: _painting)),
-                  ),
-                  child: Container(
+                const SizedBox(height: 4),
+                if (_painting.details.isEmpty)
+                  Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(18)),
                     child: Row(
                       children: [
                         const Icon(Icons.auto_awesome, color: AppColors.clay),
                         const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _painting.details.isEmpty
-                                    ? 'No hidden details found'
-                                    : '${_painting.details.length} hidden details found',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              if (lockedCount > 0)
-                                Text(
-                                  '$lockedCount locked · unlock with Pro',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                            ],
-                          ),
-                        ),
-                        if (_painting.details.isNotEmpty) const Icon(Icons.chevron_right, color: AppColors.inkSoft),
+                        Text('No hidden details found', style: Theme.of(context).textTheme.titleMedium),
                       ],
                     ),
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => HiddenDetailsPage(painting: _painting)),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.amber,
+                        foregroundColor: AppColors.ink,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                        elevation: 0,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${_painting.details.length} hidden details found',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
+                          if (lockedCount > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                '$lockedCount locked · unlock with Pro',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
                 const SizedBox(height: 12),
                 Center(
                   child: TextButton(
@@ -328,16 +402,22 @@ class _ResultPageState extends State<ResultPage> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
 }
 
+/// A circular translucent icon button. Consecutive icons in the result
+/// page's side rail are stacked with no gap and a hairline seam so they read
+/// as one fused chain of bubbles, matching the reference design.
 class _RoundIcon extends StatelessWidget {
-  const _RoundIcon({required this.icon, required this.onTap});
+  const _RoundIcon({required this.icon, required this.onTap, this.iconColor = Colors.white, this.loading = false});
 
   final IconData icon;
   final VoidCallback onTap;
+  final Color iconColor;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -347,48 +427,129 @@ class _RoundIcon extends StatelessWidget {
       child: Container(
         width: 40,
         height: 40,
-        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.35), shape: BoxShape.circle),
-        child: Icon(icon, size: 20, color: Colors.white),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.22),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 0.6),
+        ),
+        child: loading
+            ? const Padding(
+                padding: EdgeInsets.all(11),
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : Icon(icon, size: 19, color: iconColor),
       ),
     );
   }
 }
 
+/// Keeps the artist name and confidence badge on one row, badge at the right
+/// end, only when both fit without truncating the artist name — otherwise
+/// the badge drops to its own row below so the full name always shows.
+/// Draws a single continuous line with an arrowhead fused to one end (no
+/// gap, uniform color) — a separate Icon + Container line always left a seam
+/// where the icon's own internal padding met the line.
+class _ArrowLine extends StatelessWidget {
+  const _ArrowLine({required this.pointLeft});
 
-class _PillActionButton extends StatelessWidget {
-  const _PillActionButton({required this.icon, required this.label, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+  final bool pointLeft;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
-      child: Container(
-        height: 50,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(color: AppColors.ink, borderRadius: BorderRadius.circular(30)),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: Colors.white),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-                style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w600),
-              ),
+    return CustomPaint(
+      painter: _ArrowLinePainter(pointLeft: pointLeft),
+      child: const SizedBox(height: 14, width: double.infinity),
+    );
+  }
+}
+
+class _ArrowLinePainter extends CustomPainter {
+  _ArrowLinePainter({required this.pointLeft});
+
+  final bool pointLeft;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.ink
+      ..strokeWidth = 1.6
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final midY = size.height / 2;
+    const arrowSize = 5.0;
+
+    if (pointLeft) {
+      canvas.drawLine(Offset(arrowSize, midY), Offset(size.width, midY), paint);
+      final path = Path()
+        ..moveTo(arrowSize, midY - arrowSize)
+        ..lineTo(0, midY)
+        ..lineTo(arrowSize, midY + arrowSize);
+      canvas.drawPath(path, paint);
+    } else {
+      canvas.drawLine(Offset(0, midY), Offset(size.width - arrowSize, midY), paint);
+      final path = Path()
+        ..moveTo(size.width - arrowSize, midY - arrowSize)
+        ..lineTo(size.width, midY)
+        ..lineTo(size.width - arrowSize, midY + arrowSize);
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArrowLinePainter oldDelegate) => oldDelegate.pointLeft != pointLeft;
+}
+
+class _ArtistAndConfidenceRow extends StatelessWidget {
+  const _ArtistAndConfidenceRow({required this.artist, required this.confidence});
+
+  final String artist;
+  final int confidence;
+
+  double _textWidth(BuildContext context, String text, TextStyle? style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    return painter.width;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final artistStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft);
+    final badgeTextStyle = Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600);
+    final badge = ConfidenceBadge(confidence: confidence);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final artistWidth = _textWidth(context, artist, artistStyle);
+        final badgeTextWidth = _textWidth(context, '$confidence% confidence', badgeTextStyle);
+        // icon (14) + icon-text gap (5) + the badge's own horizontal padding (10 * 2)
+        final badgeWidth = badgeTextWidth + 14 + 5 + 20;
+        final fitsOnOneRow = artistWidth + 12 + badgeWidth <= constraints.maxWidth;
+
+        if (fitsOnOneRow) {
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Flexible(child: Text(artist, style: artistStyle)),
+                const Spacer(),
+                badge,
+              ],
             ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(artist, style: artistStyle),
+            const SizedBox(height: 8),
+            badge,
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }

@@ -134,5 +134,169 @@ class MockPaintings {
     details: [],
   );
 
+  static const Painting monaLisa = Painting(
+    title: 'Mona Lisa',
+    artist: 'Leonardo da Vinci',
+    year: 'c. 1503–1506',
+    movement: 'High Renaissance',
+    museum: 'Louvre Museum, Paris',
+    confidence: 98,
+    imageSeed: 3,
+    assetImagePath: 'assets/explore1.webp',
+    hook: "The most famous smile in art history — and nobody agrees on what it means.",
+    stories: {
+      'Kid':
+          "This lady's smile is a bit of a mystery! Some days it looks happy, some days it looks a "
+          "little sad. Leonardo painted her so cleverly that her face seems to change depending on "
+          "how you look at it.",
+      'Simple':
+          "Leonardo da Vinci painted the Mona Lisa in the early 1500s. It's famous for her mysterious "
+          "half-smile and for the hazy, soft-edged technique Leonardo used to paint it, called sfumato. "
+          "It's one of the most visited paintings in the world.",
+      'Art-lover':
+          "Leonardo's sfumato technique — blending tones and edges without harsh outlines — gives the "
+          "sitter's expression its famous ambiguity, shifting with the viewer's angle and focus. Likely "
+          "a portrait of Lisa Gherardini, the painting stayed in Leonardo's own possession until his "
+          "death, unusually personal for a commissioned portrait of the era.",
+    },
+    details: [
+      PaintingDetail(
+        x: 0.5,
+        y: 0.38,
+        title: 'The smile',
+        description:
+            'Painted with soft, blended transitions rather than hard lines, the sfumato technique '
+            'makes her expression seem to shift depending on where you look.',
+      ),
+      PaintingDetail(
+        x: 0.5,
+        y: 0.72,
+        title: 'The hands',
+        description:
+            'Her calmly folded hands were considered a striking innovation in portraiture, giving the '
+            'sitter a relaxed, dignified informality rare for the period.',
+        locked: true,
+      ),
+      PaintingDetail(
+        x: 0.75,
+        y: 0.25,
+        title: 'The landscape',
+        description:
+            'The hazy, imaginary landscape behind her recedes into blue-toned aerial perspective, a '
+            'technique Leonardo helped pioneer.',
+        locked: true,
+      ),
+    ],
+  );
+
+  static const Painting prodigalSon = Painting(
+    title: 'The Return of the Prodigal Son',
+    artist: 'Rembrandt van Rijn',
+    year: 'c. 1668',
+    movement: 'Dutch Golden Age',
+    museum: 'The Hermitage Museum, Saint Petersburg',
+    confidence: 90,
+    imageSeed: 4,
+    assetImagePath: 'assets/explore2.webp',
+    hook: "Painted in the last year of his life, it's Rembrandt's quiet meditation on forgiveness.",
+    stories: {
+      'Kid':
+          "A ragged, tired son kneels down and his father wraps him in a big, gentle hug. The father "
+          "is so happy his son came home that nothing else matters anymore.",
+      'Simple':
+          "Rembrandt painted this near the end of his life, around 1668. It shows the Bible story of "
+          "the prodigal son returning home in rags after wasting his inheritance, and being forgiven "
+          "and embraced by his father without a single word of blame.",
+      'Art-lover':
+          "One of Rembrandt's final works, painted with the loose, almost sculptural brushwork of his "
+          "late period. The warm reds enveloping father and son draw the eye straight to the embrace, "
+          "while the onlookers recede into shadow — Rembrandt strips the scene down to pure, wordless "
+          "mercy.",
+    },
+    details: [
+      PaintingDetail(
+        x: 0.35,
+        y: 0.55,
+        title: 'The embrace',
+        description:
+            "The father's two hands are painted differently — one broad and masculine, one softer — "
+            "often read as blending paternal and maternal tenderness in a single gesture.",
+      ),
+      PaintingDetail(
+        x: 0.35,
+        y: 0.82,
+        title: 'The worn sandal',
+        description:
+            "The son's tattered clothes and one bare, calloused foot show the poverty and hardship of "
+            "his journey home.",
+        locked: true,
+      ),
+      PaintingDetail(
+        x: 0.72,
+        y: 0.4,
+        title: 'The watching figure',
+        description:
+            'The elder son stands apart in the shadows, widely interpreted as struggling with '
+            'resentment at his brother\'s welcome.',
+        locked: true,
+      ),
+    ],
+  );
+
+  static const Painting nightWatch = Painting(
+    title: 'The Night Watch',
+    artist: 'Rembrandt van Rijn',
+    year: '1642',
+    movement: 'Dutch Golden Age',
+    museum: 'Rijksmuseum, Amsterdam',
+    confidence: 94,
+    imageSeed: 5,
+    assetImagePath: 'assets/explore3.webp',
+    hook: "It isn't actually set at night — centuries of dirty varnish just made everyone think so.",
+    stories: {
+      'Kid':
+          "This huge painting shows a group of soldiers marching out, all bustling and busy. For a "
+          "long time people thought it showed nighttime because it looked so dark — but that was just "
+          "old, dirty varnish!",
+      'Simple':
+          "Rembrandt painted this militia group portrait in 1642. Its real title is much longer, and "
+          "it wasn't originally a night scene at all — grime and darkened varnish over the centuries "
+          "made it look that way until it was cleaned.",
+      'Art-lover':
+          "Rembrandt broke from the static, row-by-row convention of Dutch militia portraits, staging "
+          "the company mid-movement with dramatic chiaroscuro lighting picking key figures out of the "
+          "crowd. The painting was trimmed on all sides in 1715 to fit a new location, permanently "
+          "altering its original composition.",
+    },
+    details: [
+      PaintingDetail(
+        x: 0.42,
+        y: 0.45,
+        title: 'Captain Cocq',
+        description:
+            'The dark-clad figure in the center commissioned the piece along with his militia company '
+            '— unusually, Rembrandt shows him mid-gesture rather than posed still.',
+      ),
+      PaintingDetail(
+        x: 0.58,
+        y: 0.55,
+        title: 'The mysterious girl',
+        description:
+            'A small girl in golden light glows amid the soldiers for no clear narrative reason — one '
+            'of the painting\'s most debated details.',
+        locked: true,
+      ),
+      PaintingDetail(
+        x: 0.2,
+        y: 0.35,
+        title: 'The lighting',
+        description:
+            "Rembrandt's dramatic light-and-shadow staging was radical for a group portrait, breaking "
+            "from the flat, evenly lit convention of the genre.",
+        locked: true,
+      ),
+    ],
+  );
+
   static const List<Painting> collection = [starryNight, girlWithPearl, unknownStillLife];
 }

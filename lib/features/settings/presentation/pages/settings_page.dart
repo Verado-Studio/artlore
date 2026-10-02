@@ -22,14 +22,17 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  String _depth = 'Simple';
+  String _depth = UserDataRepository.cachedDepth ?? 'Simple';
   User? _user;
   late final StreamSubscription<User?> _authSubscription;
 
   @override
   void initState() {
     super.initState();
-    _authSubscription = AuthService.authStateChanges.listen((user) {
+    // userChanges (not authStateChanges): signing up or linking Google/Apple
+    // upgrades the guest account in place, which authStateChanges doesn't
+    // report — so the "Signed in" row stayed stale until a relaunch.
+    _authSubscription = AuthService.userChanges.listen((user) {
       setState(() => _user = user);
       _loadDepth();
     });
@@ -69,6 +72,53 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
     await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const SignInPage()));
+  }
+
+  Future<void> _handleDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This permanently deletes your account and all your data — your Collection, Pro status, and '
+          'preferences. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      await AuthService.deleteAccount();
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AppShell()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AuthService.friendlyMessage(e))));
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't delete your account — please try again.")),
+      );
+    }
   }
 
   void _pickDepth() {
@@ -146,11 +196,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   SettingsTile(icon: Icons.tune, label: 'Default depth', value: _depth, onTap: _pickDepth),
                   SettingsTile(icon: Icons.restore, label: 'Restore purchases', onTap: () => restorePurchases(context)),
                   SettingsTile(
-                    icon: Icons.workspace_premium_outlined,
-                    label: 'Manage subscription',
-                    onTap: openManageSubscription,
-                  ),
-                  SettingsTile(
                     icon: Icons.privacy_tip_outlined,
                     label: 'Privacy policy',
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PrivacyPolicyPage())),
@@ -166,13 +211,32 @@ class _SettingsPageState extends State<SettingsPage> {
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HelpSupportPage())),
                   ),
                   const SettingsTile(icon: Icons.language_outlined, label: 'Language', value: 'English'),
-                  SettingsTile(
-                    icon: Icons.login,
-                    label: signedIn ? 'Signed in' : 'Sign in',
-                    value: signedInLabel,
-                    onTap: _handleSignInTap,
-                    showDivider: false,
-                  ),
+                  if (signedIn)
+                    SettingsTile(
+                      icon: Icons.account_circle_outlined,
+                      label: 'Signed in',
+                      subtitle: signedInLabel,
+                      labelAction: TextButton(
+                        onPressed: _handleSignInTap,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.clay,
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Sign out', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      ),
+                    )
+                  else
+                    SettingsTile(icon: Icons.login, label: 'Sign in', onTap: _handleSignInTap, showDivider: false),
+                  if (signedIn)
+                    SettingsTile(
+                      icon: Icons.delete_outline,
+                      label: 'Delete account',
+                      color: AppColors.error,
+                      onTap: _handleDeleteAccount,
+                      showDivider: false,
+                    ),
                 ],
               ),
             ),

@@ -1,5 +1,5 @@
 class AppStrings {
   AppStrings._();
 
-  static const String appName = 'Painting Explainer';
+  static const String appName = 'Artlore';
 }

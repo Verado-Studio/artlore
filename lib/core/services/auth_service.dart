@@ -2,6 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../models/painting.dart';
+import 'purchases.dart';
+import 'scan_photo_cloud.dart';
 import 'user_data_repository.dart';
 
 /// Thin wrapper around Firebase Authentication. Email/password, Google (web
@@ -29,6 +32,10 @@ class AuthService {
 
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  /// Like [authStateChanges], but also fires on profile updates such as the
+  /// display name being set right after sign-up.
+  static Stream<User?> get userChanges => _auth.userChanges();
+
   static User? get currentUser => _auth.currentUser;
 
   /// Whether [currentUser] is a real (non-anonymous) account — the signal
@@ -51,21 +58,94 @@ class AuthService {
     }
   }
 
+  /// Every device is signed in anonymously from launch (see [ensureSignedIn])
+  /// so its scans land in Firestore under that anonymous uid. A plain
+  /// `createUserWithEmailAndPassword`/`signInWithCredential` call abandons
+  /// that uid for a brand-new one, which is what was silently losing scans
+  /// on sign-up — [_upgradeOrSignIn] links the new credential onto the
+  /// *same* anonymous account instead, keeping its uid (and Firestore data)
+  /// intact, unless that credential already belongs to a different,
+  /// pre-existing account — in which case switching to that account (and
+  /// leaving this device's anonymous data behind) is the correct behavior.
+  static Future<UserCredential> _upgradeOrSignIn(AuthCredential credential) async {
+    final current = _auth.currentUser;
+    if (current != null && current.isAnonymous) {
+      try {
+        return await current.linkWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        if (e.code != 'credential-already-in-use' && e.code != 'email-already-in-use') rethrow;
+      }
+    }
+    return _auth.signInWithCredential(credential);
+  }
+
+  /// Unlike social sign-in, an email that's already registered is an error
+  /// here — falling through to a sign-in attempt with the new password was
+  /// surfacing as a misleading "Incorrect email or password".
   static Future<void> signUp({required String email, required String password, required String displayName}) async {
-    final credential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+    final current = _auth.currentUser;
+    final credential = current != null && current.isAnonymous
+        ? await current.linkWithCredential(EmailAuthProvider.credential(email: email, password: password))
+        : await _auth.createUserWithEmailAndPassword(email: email, password: password);
     await credential.user?.updateDisplayName(displayName);
     await UserDataRepository.migrateLocalDataIfNeeded();
+    await RevenueCatService.syncIdentity();
+  }
+
+  /// Reads the current guest's scans before an identity switch, so they can
+  /// be merged into the account being signed into afterwards.
+  static Future<List<Painting>> _guestScans() async {
+    final current = _auth.currentUser;
+    if (current == null || !current.isAnonymous) return const [];
+    try {
+      return await UserDataRepository.savedPaintings();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> _finishSignIn(List<Painting> guestScans) async {
+    await UserDataRepository.migrateLocalDataIfNeeded();
+    await UserDataRepository.mergeGuestScans(guestScans);
+    await RevenueCatService.syncIdentity();
   }
 
   static Future<void> signIn({required String email, required String password}) async {
+    final guestScans = await _guestScans();
     await _auth.signInWithEmailAndPassword(email: email, password: password);
-    await UserDataRepository.migrateLocalDataIfNeeded();
+    await _finishSignIn(guestScans);
+  }
+
+  /// Web: asks Google to show the account chooser rather than silently
+  /// reusing whichever account the browser is already signed in to.
+  static GoogleAuthProvider get _googleWebProvider =>
+      GoogleAuthProvider()..setCustomParameters({'prompt': 'select_account'});
+
+  /// Native: google_sign_in remembers the last account picked and hands it
+  /// back without showing the chooser, so clear it first.
+  static Future<void> _forgetGoogleAccount() async {
+    if (kIsWeb) return;
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
   }
 
   static Future<void> signInWithGoogle() async {
+    final guestScans = await _guestScans();
     if (kIsWeb) {
-      await _auth.signInWithPopup(GoogleAuthProvider());
+      final current = _auth.currentUser;
+      if (current != null && current.isAnonymous) {
+        try {
+          await current.linkWithPopup(_googleWebProvider);
+        } on FirebaseAuthException catch (e) {
+          if (e.code != 'credential-already-in-use' && e.code != 'email-already-in-use') rethrow;
+          await _auth.signInWithPopup(_googleWebProvider);
+        }
+      } else {
+        await _auth.signInWithPopup(_googleWebProvider);
+      }
     } else {
+      await _forgetGoogleAccount();
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         throw FirebaseAuthException(code: 'popup-closed-by-user', message: 'Sign-in was cancelled.');
@@ -75,9 +155,9 @@ class AuthService {
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      await _auth.signInWithCredential(credential);
+      await _upgradeOrSignIn(credential);
     }
-    await UserDataRepository.migrateLocalDataIfNeeded();
+    await _finishSignIn(guestScans);
   }
 
   /// Apple's OAuth 2 provider, via Firebase's own generic `signInWithProvider`
@@ -90,11 +170,41 @@ class AuthService {
     final provider = OAuthProvider('apple.com')
       ..addScope('email')
       ..addScope('name');
-    await _auth.signInWithProvider(provider);
-    await UserDataRepository.migrateLocalDataIfNeeded();
+    final guestScans = await _guestScans();
+    final current = _auth.currentUser;
+    if (current != null && current.isAnonymous) {
+      try {
+        await current.linkWithProvider(provider);
+      } on FirebaseAuthException catch (e) {
+        if (e.code != 'credential-already-in-use' && e.code != 'email-already-in-use') rethrow;
+        await _auth.signInWithProvider(provider);
+      }
+    } else {
+      await _auth.signInWithProvider(provider);
+    }
+    await _finishSignIn(guestScans);
   }
 
-  static Future<void> signOut() => _auth.signOut();
+  static Future<void> signOut() async {
+    await _auth.signOut();
+    await _forgetGoogleAccount();
+    await RevenueCatService.syncIdentity();
+  }
+
+  /// Permanently deletes the signed-in account: its Firestore data first
+  /// (while it can still authenticate that delete), then the Firebase Auth
+  /// user itself. Throws [FirebaseAuthException] with code
+  /// 'requires-recent-login' if the sign-in session is too old — the caller
+  /// should ask the user to sign in again and retry.
+  static Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous) return;
+    await ScanPhotoCloud.deleteAllForCurrentUser();
+    await UserDataRepository.deleteAllData();
+    await user.delete();
+    await _forgetGoogleAccount();
+    await RevenueCatService.syncIdentity();
+  }
 
   /// Turns a [FirebaseAuthException] into copy a user can actually act on.
   static String friendlyMessage(FirebaseAuthException error) {
@@ -108,14 +218,17 @@ class AuthService {
       case 'invalid-credential':
         return 'Incorrect email or password.';
       case 'email-already-in-use':
-        return 'An account already exists with that email.';
+      case 'credential-already-in-use':
+        return 'An account already exists with that email. Try signing in instead.';
       case 'weak-password':
-        return 'Choose a stronger password (at least 6 characters).';
+        return 'Choose a stronger password (at least 8 characters).';
       case 'network-request-failed':
         return 'Network error — check your connection and try again.';
       case 'popup-closed-by-user':
       case 'cancelled-popup-request':
         return 'Sign-in was cancelled.';
+      case 'requires-recent-login':
+        return 'For your security, please sign out and sign back in, then try again.';
       default:
         return error.message ?? 'Something went wrong. Please try again.';
     }

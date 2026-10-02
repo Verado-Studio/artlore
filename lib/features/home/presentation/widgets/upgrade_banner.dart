@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/painting_placeholder.dart';
 
 class UpgradeBanner extends StatelessWidget {
   const UpgradeBanner({super.key, required this.onTap});
@@ -14,7 +13,7 @@ class UpgradeBanner extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: Stack(
         children: [
-          Positioned.fill(child: PaintingPlaceholder(seed: 0, showFrame: false, borderRadius: 0)),
+          Positioned.fill(child: Image.asset('assets/home-banner.jfif', fit: BoxFit.cover)),
           Positioned.fill(child: Container(color: AppColors.ink.withValues(alpha: 0.82))),
           Padding(
             padding: const EdgeInsets.all(16),

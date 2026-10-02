@@ -3,11 +3,11 @@ import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:artdetector/core/services/auth_service.dart';
-import 'package:artdetector/core/services/user_data_repository.dart';
-import 'package:artdetector/core/theme/app_theme.dart';
-import 'package:artdetector/core/widgets/app_shell.dart';
-import 'package:artdetector/main.dart';
+import 'package:artlore/core/services/auth_service.dart';
+import 'package:artlore/core/services/user_data_repository.dart';
+import 'package:artlore/core/theme/app_theme.dart';
+import 'package:artlore/core/widgets/app_shell.dart';
+import 'package:artlore/main.dart';
 
 void main() {
   // Widget tests never touch a real backend: swap in pure-Dart fakes instead
@@ -20,7 +20,7 @@ void main() {
   testWidgets('App launches into the splash screen', (WidgetTester tester) async {
     await tester.pumpWidget(const ArtfulApp());
 
-    expect(find.text('Painting Explainer'), findsOneWidget);
+    expect(find.text('Artlore'), findsOneWidget);
     expect(find.text('Look closer. Discover more.'), findsOneWidget);
   });
 
@@ -34,7 +34,7 @@ void main() {
     await tester.tap(find.text('Collection'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('My Collection'), findsOneWidget);
+    expect(find.text('Saved artworks'), findsOneWidget);
 
     await tester.tap(find.text('Ask'));
     await tester.pumpAndSettle();

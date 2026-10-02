@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/constants/art_facts.dart';
 import '../../../../core/services/painting_identifier_service.dart';
 import '../../../../core/services/scanned_image_store.dart';
 import '../../../../core/services/user_data_repository.dart';
@@ -12,15 +13,6 @@ import '../../../../core/widgets/app_shell.dart';
 import '../../../../core/widgets/scanned_image.dart';
 import '../../../paywall/presentation/pages/paywall_page.dart';
 import '../../../result/presentation/pages/result_page.dart';
-
-const _funArtFacts = [
-  "Van Gogh sold only one painting during his lifetime.",
-  "The Mona Lisa has no eyebrows — it was fashionable to shave them off.",
-  "A Jackson Pollock painting once sold for over \$200 million.",
-  "Leonardo da Vinci was left-handed and wrote in mirror script.",
-  "The paint on Rembrandt's canvases is sometimes inches thick.",
-  "Edvard Munch's 'The Scream' has been stolen twice — and recovered twice.",
-];
 
 class AnalysingPage extends StatefulWidget {
   const AnalysingPage({super.key, this.image});
@@ -35,15 +27,36 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
   late final AnimationController _shimmer =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
   Timer? _factTimer;
-  int _factIndex = math.Random().nextInt(_funArtFacts.length);
+  Timer? _progressTimer;
+  int _factIndex = math.Random().nextInt(artFacts.length);
   String? _error;
+
+  /// Real identify progress isn't reported incrementally by the server, so
+  /// this is a simulated crawl toward (never reaching) 94% — just enough to
+  /// keep the wait feeling active. It jumps away entirely once the real
+  /// result or error arrives.
+  double _progress = 0;
 
   @override
   void initState() {
     super.initState();
     _identify();
     _factTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) setState(() => _factIndex = (_factIndex + 1) % _funArtFacts.length);
+      if (mounted) setState(() => _factIndex = (_factIndex + 1) % artFacts.length);
+    });
+    _startProgressSimulation();
+  }
+
+  void _startProgressSimulation() {
+    const tick = Duration(milliseconds: 200);
+    const expectedTicks = 45; // ~9s ease-out crawl toward 94%
+    var elapsed = 0;
+    _progressTimer = Timer.periodic(tick, (timer) {
+      elapsed++;
+      final t = (elapsed / expectedTicks).clamp(0.0, 1.0);
+      final eased = 1 - math.pow(1 - t, 3);
+      if (mounted) setState(() => _progress = eased * 0.94);
+      if (t >= 1.0) timer.cancel();
     });
   }
 
@@ -54,15 +67,18 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
       return;
     }
     try {
-      final painting = await PaintingIdentifierService.identify(image);
+      final identified = await PaintingIdentifierService.identify(image);
       final persistedPath = await ScannedImageStore.persist(image.path);
-      final withImage = painting.withScannedImagePath(persistedPath);
+      final withImage = identified.painting.withScannedImagePath(persistedPath);
       await UserDataRepository.recordScan(withImage);
+      unawaited(UserDataRepository.uploadScanPhoto(withImage, identified.jpeg));
+      _progressTimer?.cancel();
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => ResultPage(painting: withImage)),
       );
     } on PaintingQuotaExceededException catch (e) {
+      _progressTimer?.cancel();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const AppShell()),
@@ -70,8 +86,10 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
       );
       showPaywallSheet(context, subtitle: e.message);
     } on PaintingIdentificationException catch (e) {
+      _progressTimer?.cancel();
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
+      _progressTimer?.cancel();
       if (mounted) setState(() => _error = "Couldn't identify the painting — please try again.");
     }
   }
@@ -80,6 +98,7 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
   void dispose() {
     _shimmer.dispose();
     _factTimer?.cancel();
+    _progressTimer?.cancel();
     super.dispose();
   }
 
@@ -139,6 +158,33 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
                             );
                           },
                         ),
+                      if (error == null)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: _BorderProgressPainter(progress: _progress, radius: 24, strokeWidth: 4),
+                            ),
+                          ),
+                        ),
+                      if (error == null)
+                        Positioned(
+                          bottom: 14,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${(_progress * 100).round()}%',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -150,24 +196,31 @@ class _AnalysingPageState extends State<AnalysingPage> with SingleTickerProvider
                 style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white),
               ),
               const SizedBox(height: 14),
-              if (error == null)
-                SizedBox(
-                  height: 44,
+              if (error == null) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 350),
                     child: Text(
-                      _funArtFacts[_factIndex],
+                      artFacts[_factIndex],
                       key: ValueKey(_factIndex),
                       textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: 0.65)),
                     ),
                   ),
                 ),
+              ],
               const Spacer(),
               if (error != null)
                 ElevatedButton(
                   onPressed: () {
-                    setState(() => _error = null);
+                    setState(() {
+                      _error = null;
+                      _progress = 0;
+                    });
+                    _startProgressSimulation();
                     _identify();
                   },
                   child: const Text('Try again'),
@@ -198,4 +251,51 @@ class _SweepGradientTransform extends GradientTransform {
   Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
     return Matrix4.translationValues(offset, 0, 0);
   }
+}
+
+/// Traces analysis progress around the image frame's own rounded border
+/// instead of a separate bar — a faint full track plus a gold segment that
+/// grows from the top-left corner clockwise as [progress] increases.
+class _BorderProgressPainter extends CustomPainter {
+  const _BorderProgressPainter({required this.progress, required this.radius, required this.strokeWidth});
+
+  final double progress;
+  final double radius;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final inset = strokeWidth / 2;
+    final rect = Rect.fromLTWH(inset, inset, size.width - strokeWidth, size.height - strokeWidth);
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+    final trackPath = Path()..addRRect(rrect);
+
+    canvas.drawPath(
+      trackPath,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.25)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth,
+    );
+
+    final clamped = progress.clamp(0.0, 1.0);
+    if (clamped <= 0) return;
+    final metrics = trackPath.computeMetrics().toList();
+    if (metrics.isEmpty) return;
+    final metric = metrics.first;
+    final progressPath = metric.extractPath(0, metric.length * clamped);
+
+    canvas.drawPath(
+      progressPath,
+      Paint()
+        ..color = AppColors.gold
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BorderProgressPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.strokeWidth != strokeWidth || oldDelegate.radius != radius;
 }

@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>326099273958-4cfdchbv610prvf0u0ue2ekt19co5046.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.326099273958-4cfdchbv610prvf0u0ue2ekt19co5046</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>326099273958-i19b2eil9jl4nerpcr4p4gnvo58kpnna.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyD4vp9K6MmoHM0_SxaBEKp6WBPQtE2Vcfw</string>
 	<key>GCM_SENDER_ID</key>
@@ -9,26 +15,22 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.veradostudio.artdetector</string>
+	<string>com.veradostudio.artlore</string>
 	<key>PROJECT_ID</key>
 	<string>paintings-identifier</string>
 	<key>STORAGE_BUCKET</key>
 	<string>paintings-identifier.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
-	<false/>
+	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
-	<false/>
+	<false></false>
 	<key>IS_APPINVITE_ENABLED</key>
-	<false/>
+	<true></true>
 	<key>IS_GCM_ENABLED</key>
-	<true/>
+	<true></true>
 	<key>IS_SIGNIN_ENABLED</key>
-	<true/>
+	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:326099273958:ios:d7439be8332ffe28f25327</string>
-	<key>CLIENT_ID</key>
-	<string>326099273958-ra7k7i7el3gm5uf5pj493snm43cm3n2r.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.326099273958-ra7k7i7el3gm5uf5pj493snm43cm3n2r</string>
+	<string>1:326099273958:ios:949c3ac28b93e7b3f25327</string>
 </dict>
 </plist>

@@ -48,6 +48,8 @@ class _HiddenDetailsPageState extends State<HiddenDetailsPage> {
           ScannedImage(
             seed: _painting.imageSeed,
             imagePath: _painting.scannedImagePath,
+            imageUrl: _painting.imageUrl,
+            assetPath: _painting.assetImagePath,
             showFrame: false,
             borderRadius: 0,
           ),

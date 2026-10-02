@@ -22,9 +22,13 @@ Future<void> _shareCardImage(BuildContext context, GlobalKey boundaryKey, Painti
     if (byteData == null) return;
     final bytes = byteData.buffer.asUint8List();
     final file = XFile.fromData(bytes, mimeType: 'image/png', name: 'painting_share.png');
+    // iPad shows the share sheet as a popover, which needs an on-screen
+    // anchor — without one the share fails there. Anchor it to the card.
+    final origin = renderObject.localToGlobal(Offset.zero) & renderObject.size;
     await Share.shareXFiles(
       [file],
       text: '${painting.title} by ${painting.artist} — discovered with ${AppStrings.appName}.',
+      sharePositionOrigin: origin,
     );
   } catch (_) {
     messenger.showSnackBar(const SnackBar(content: Text("Couldn't create the share image — please try again.")));
@@ -37,7 +41,9 @@ void showShareCardSheet(BuildContext context, Painting painting) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) => Padding(
+    builder: (context) => SafeArea(
+      top: false,
+      child: Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
@@ -61,6 +67,8 @@ void showShareCardSheet(BuildContext context, Painting painting) {
                         child: ScannedImage(
                           seed: painting.imageSeed,
                           imagePath: painting.scannedImagePath,
+                          imageUrl: painting.imageUrl,
+                          assetPath: painting.assetImagePath,
                           borderRadius: 16,
                           showFrame: false,
                         ),
@@ -90,57 +98,23 @@ void showShareCardSheet(BuildContext context, Painting painting) {
               ),
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _ShareTarget(
-                  icon: Icons.chat_bubble_outline,
-                  label: 'Messages',
-                  onTap: () => _shareCardImage(context, boundaryKey, painting),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _shareCardImage(context, boundaryKey, painting),
+                icon: const Icon(Icons.ios_share),
+                label: const Text('Share'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.ink,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                _ShareTarget(
-                  icon: Icons.camera_alt_outlined,
-                  label: 'Instagram',
-                  onTap: () => _shareCardImage(context, boundaryKey, painting),
-                ),
-                _ShareTarget(
-                  icon: Icons.more_horiz,
-                  label: 'More',
-                  onTap: () => _shareCardImage(context, boundaryKey, painting),
-                ),
-              ],
+              ),
             ),
           ],
         ),
       ),
+      ),
     ),
   );
-}
-
-class _ShareTarget extends StatelessWidget {
-  const _ShareTarget({required this.icon, required this.label, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(26),
-      child: Column(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: const BoxDecoration(color: AppColors.surfaceMuted, shape: BoxShape.circle),
-            child: Icon(icon, color: AppColors.ink),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-        ],
-      ),
-    );
-  }
 }

@@ -74,9 +74,10 @@ class OnboardingScaffold extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   bottomActions,
-                  const SizedBox(height: 72),
+                  const SizedBox(height: 20),
                   PageDots(
                     count: pageCount,
                     index: pageIndex,

@@ -6,7 +6,6 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/services/app_preferences.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_shell.dart';
-import '../../../../core/widgets/painting_placeholder.dart';
 import '../../../onboarding/presentation/pages/onboarding_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -40,20 +39,18 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.ink,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          const PaintingPlaceholder(icon: Icons.landscape_outlined, seed: 2, showFrame: false, borderRadius: 0),
-          Container(color: Colors.black.withValues(alpha: 0.4)),
+          Image.asset('assets/splash.webp', fit: BoxFit.cover),
+          Container(color: AppColors.ink.withValues(alpha: 0.55)),
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                  child: const Icon(Icons.palette_outlined, color: AppColors.clay, size: 38),
+                ClipOval(
+                  child: Image.asset('assets/logo.png', width: 128, height: 128, fit: BoxFit.cover),
                 ),
                 const SizedBox(height: 22),
                 Text(
